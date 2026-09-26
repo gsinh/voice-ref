@@ -1,6 +1,6 @@
 -- Resets the synthetic demo data. Idempotent: safe to run any time (e.g. nightly).
 -- Dates are relative to now() so "yesterday" is always yesterday.
-TRUNCATE transactions, cards, accounts, customers;
+TRUNCATE card_blocks, transactions, cards, accounts, customers;
 
 INSERT INTO customers (id, full_name, phone, preferred_language) VALUES
   ('CUST-1001', 'Aarav Sharma', '+919800000001', 'en'),

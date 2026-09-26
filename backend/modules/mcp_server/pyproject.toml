@@ -3,7 +3,13 @@ name = "mcp-server"
 version = "0.1.0"
 description = "MCP server: the only way the LLM reaches bank data (ADR-0006)."
 requires-python = ">=3.12,<3.13"
-dependencies = ["fastapi>=0.116", "pydantic-settings>=2.10"]
+dependencies = [
+    "fastapi>=0.116",
+    "pydantic-settings>=2.10",
+    "mcp>=2.2",
+    "httpx>=0.28",
+    "pyjwt>=2.10",
+]
 
 [build-system]
 requires = ["hatchling"]

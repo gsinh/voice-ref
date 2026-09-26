@@ -3,7 +3,17 @@ name = "orchestrator"
 version = "0.1.0"
 description = "Conversation orchestrator: the LangGraph graph behind text and voice."
 requires-python = ">=3.12,<3.13"
-dependencies = ["fastapi>=0.116", "pydantic-settings>=2.10"]
+dependencies = [
+    "fastapi>=0.116",
+    "pydantic-settings>=2.10",
+    "psycopg[binary,pool]>=3.2",
+    "langgraph>=1.2",
+    "langgraph-checkpoint-postgres>=3.1",
+    "langchain-openai>=1.6",
+    "langchain-mcp-adapters>=0.3",
+    "httpx>=0.28",
+    "pyjwt>=2.10",
+]
 
 [build-system]
 requires = ["hatchling"]
