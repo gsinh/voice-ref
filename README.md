@@ -33,19 +33,33 @@ Requires Docker (OrbStack or Docker Desktop), [uv](https://docs.astral.sh/uv/) a
 
 ```bash
 make setup   # install dependencies, create .env
-make up      # postgres → migrate + seed → backend → web, waits until healthy
-open http://localhost:3000
+# edit .env: set LLM_API_KEY (Groq) and a random TOKEN_SIGNING_KEY
+make up      # postgres → migrate + seed → backend (+ Laya sidecar) → web
+open http://localhost:3000/chat
 ```
+
+The first start downloads Laya's weights (a few GB) into a Docker volume. On a Mac it is
+faster to run Laya natively on the Apple GPU and leave it out of the image; see the
+System 1 section of `.env.example`. To work fully offline, point `LLM_BASE_URL` at
+Ollama.
 
 | URL | What |
 |---|---|
-| http://localhost:3000 | Web app (system status for now) |
+| http://localhost:3000/chat | Text chat with a per-turn trace (decisions, tools, timings) |
+| http://localhost:3000 | Overview and system status |
 | http://localhost:7860/docs | Backend API docs |
-| http://localhost:7860/readyz | Backend readiness |
 
-Other commands: `make help`. Run `make check` to run everything CI runs.
+Try, as Aarav Sharma (one-time code `123456`):
+- "What's my balance?"
+- "What is this ₹1,999 charge from yesterday?"
+- "I've lost my debit card" → confirm → the card is blocked, once
+
+`make seed` resets the demo data. `make help` lists everything; `make check` runs what CI
+runs.
 
 ## Status
 
-Phase 0 (skeleton) is done. Next is Phase 1: the text path with LangGraph, Laya, MCP and
-the three use cases. See the phase table in the [plan](docs/PLAN.md#8-phases).
+Phases 0–1 are done: the text path works end to end, with guardrails enforced in code
+(OTP, token-derived identity, confirmation tokens, idempotent blocking). Next is Phase 2:
+voice (LiveKit Cloud, Silero VAD, Whisper, Kokoro). See the
+[plan](docs/PLAN.md#8-phases).

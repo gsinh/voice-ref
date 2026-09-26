@@ -72,7 +72,7 @@ def _choose(system: str, said: str) -> str:
     for line in system.splitlines():  # card question: "- CARD-3001: Visa debit card ..."
         if line.startswith("- CARD-") and line.split()[3] in s:  # the card type
             return line[2:].split(":")[0]
-    return "other"
+    return "unspecified" if "- unspecified:" in system else "other"
 
 
 def fake_llm_router() -> APIRouter:

@@ -23,12 +23,17 @@ jobs:
         image: postgres:17-alpine
         env:
           POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: voiceref
         ports: ["5432:5432"]
         options: >-
           --health-cmd "pg_isready -U postgres"
           --health-interval 5s --health-timeout 3s --health-retries 10
     env:
-      TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
+      # Integration and end-to-end tests run against real Postgres (with the same
+      # bootstrap, roles and migrations as production).
+      TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/voiceref
+      TEST_BANK_DATABASE_URL: postgresql://bank_api:bank@localhost:5432/voiceref
+      TEST_ORCHESTRATOR_DATABASE_URL: postgresql://orchestrator:orch@localhost:5432/voiceref
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
@@ -40,7 +45,17 @@ jobs:
       - name: Module boundaries
         run: uv run lint-imports
       - name: Typecheck
-        run: uv run mypy apps modules
+        run: uv run mypy apps libs modules
+      - name: Bootstrap database (roles and schemas)
+        run: >-
+          psql "$TEST_DATABASE_URL" -v bank_pw=bank -v orch_pw=orch
+          -f ../infra/postgres/bootstrap.sql
+      - name: Migrate
+        run: uv run python -m gateway migrate
+        env:
+          BANK_DATABASE_URL: ${{ env.TEST_BANK_DATABASE_URL }}
+          ORCHESTRATOR_DATABASE_URL: ${{ env.TEST_ORCHESTRATOR_DATABASE_URL }}
+          TOKEN_SIGNING_KEY: ci-only-signing-key-not-a-secret-0123456789
       - name: Test
         run: uv run pytest -q
 

@@ -54,12 +54,12 @@ A large Indian retail bank handles millions of calls a month through a menu-driv
    ▼                                            │ outbound
 ┌──────────── Hugging Face Space: backend (private, Docker) ─────────────────────┐
 │  process 1: gateway (FastAPI) — modular monolith                                │
-│    /api     orchestrator  LangGraph: auth_gate → memory_recall → decide         │
-│                           → account | card | general agent → respond           │
-│    /decide  decision      Laya System-1 (in-process, ONNX)                      │
-│    /mcp     mcp_server    FastMCP tools  ──HTTP──►  /bank                       │
+│    /api     orchestrator  LangGraph: understand → authenticate (OTP)            │
+│                           → account agent | card flow | general | handoff      │
+│    /mcp     mcp_server    MCP tools (identity from session token) ──► /bank     │
 │    /bank    banking_api   mock system of record                                 │
-│  process 2: agentgateway  127.0.0.1:15000 — LLM + MCP routing, policy, failover │
+│  process 2: laya-serve    127.0.0.1:8100 — System 1 decisions (or hosted Jev)   │
+│  process 2b: agentgateway 127.0.0.1:15000 — LLM + MCP policy, failover (Ph. 3)  │
 │  process 3: voice worker  Silero VAD · Groq Whisper · Kokoro TTS  (Phase 2)     │
 └──────────────────────────────────────────────────────────────────────────────────┘
         │                          │                          │
@@ -123,7 +123,7 @@ The voice turn does the minimum synchronously. Everything durable and slow runs 
 | Media | LiveKit Cloud | Self-hosted LiveKit (compose profile) |
 | VAD | Silero | — |
 | STT | Groq Whisper | faster-whisper container |
-| System 1 | Laya (ONNX, Hugging Face weights) | `LLMDecision` adapter |
+| System 1 | Laya's server (`laya-serve`) as a localhost sidecar; natively on the Mac GPU in dev | Hosted Jev (same API), or `LLMDecision` |
 | System 2 | Llama on Groq | Llama on Ollama (native on the Mac: `llama3.2:3b`) |
 | Orchestration | LangGraph + Postgres checkpointer | — |
 | Tools | MCP (FastMCP, streamable HTTP) + `langchain-mcp-adapters` | — |
@@ -161,13 +161,13 @@ voice-ref/
 ├── .env.example               # every setting, documented
 ├── Makefile                   # the commands a contributor runs (CI runs the same)
 ├── backend/                   # uv workspace; this folder is what the HF Space builds
-│   ├── Dockerfile             # one image: serve | migrate | seed
-│   ├── apps/gateway/          # composition root, health, migration runner, CLI
+│   ├── Dockerfile             # one image: start | serve | migrate | seed (+ Laya venv)
+│   ├── apps/gateway/          # composition root, health, migrations, launcher, CLI
+│   ├── libs/signed_tokens/    # shared kernel: session + confirmation JWTs
 │   └── modules/
 │       ├── orchestrator/      # LangGraph                → /api
 │       ├── banking_api/       # mock bank (schema bank)  → /bank
-│       ├── mcp_server/        # MCP tools                → /mcp
-│       └── decision/          # Laya System-1            → /decide
+│       └── mcp_server/        # MCP tools                → /mcp
 ├── web/                       # Next.js SSR BFF
 ├── infra/
 │   ├── postgres/              # one-time role/schema bootstrap (local + Neon)
@@ -184,7 +184,7 @@ voice-ref/
 | Phase | Build | Done when |
 |---|---|---|
 | **0. Skeleton** ✓ | Modular-monolith backend (gateway + 4 module stubs), health checks, per-module roles/schemas, migration runner, seed data, Next.js SSR status page, compose, CI (lint, boundaries, typecheck, tests, image builds), ADRs | `make up` starts everything healthy; CI green |
-| **1. Core (text)** | Banking API, MCP tools, Laya decision service, LangGraph graph (auth, routing, 3 agents, interrupt-based confirmation, confirmation token), mock OTP, `/chat` | All three use cases work in text on Groq and on Ollama |
+| **1. Core (text)** ✓ | Banking API, MCP tools, signed tokens, Laya sidecar + decision cascade, LangGraph graph (OTP auth, routing, account agent, card flow with interrupt-based confirmation), launcher, `/chat` with per-turn trace | All three use cases work in text; verified end to end with a scripted OpenAI-compatible model (Groq and Laya to be confirmed on a machine that can reach them) |
 | **2. Voice** | Voice worker (LiveKit Cloud, Silero, Groq Whisper, Kokoro), `/call`, `latency-probe` | All three use cases work by voice; per-stage latency captured |
 | **3. Production traits** | OTel + LangSmith, `/observability`, fault toggles, fallback controller, human handoff, audit log, Kestra (`workflows` profile locally, own HF Space in production), memory (Synap + Postgres adapter), agentgateway sidecar with failover and tool policies (ADR-0017) | Every fault degrades gracefully; latency visible per turn |
 | **4. Evaluation** | ~80-case dataset incl. Hindi/Hinglish; intent, tool-choice, task completion, groundedness, sensitive-action compliance; Laya vs Llama; Groq vs Ollama; `/evals` | `make eval` produces a report; nightly Kestra run |

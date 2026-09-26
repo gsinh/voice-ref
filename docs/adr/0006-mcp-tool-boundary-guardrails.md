@@ -14,10 +14,19 @@ defence.
   `get_transaction_details`, `get_card_status`, `block_card`.
 - The MCP server calls the banking API. It never holds database credentials for the bank
   schema itself.
-- Every tool has a **risk level**. Read tools need an authenticated session.
-  `block_card` needs a **single-use confirmation token** that only the orchestrator's
-  policy node can issue, after an explicit confirmation. It also takes an
-  **idempotency key**, and every call is written to an **audit log**.
+- **Identity never comes from the model.** Every MCP call carries a short-lived
+  **session token** (a JWT the orchestrator mints per turn after the one-time code);
+  tools read the customer from it, and **no tool takes a customer id argument**. A
+  prompt-injected "show me CUST-1002's balance" has nothing to act on.
+- `block_card` also needs a **confirmation token**: a JWT bound to this customer, this
+  action and this card, issued by deterministic graph code only after an explicit
+  confirmation. Its unique id is the bank's **idempotency key**, so replaying it can
+  never block twice.
+- **The LLM is never given `block_card`.** It only gets the three read-only account
+  tools; the card flow calls `block_card` itself, and replies with a fixed template.
+- Both token types live in one shared kernel (`libs/signed_tokens`), so issuer and
+  verifier cannot drift apart. Every call is recorded in the turn trace (Phase 3 adds a
+  persistent audit log).
 
 ## Alternatives considered
 - **Give the LLM SQL or direct API access.** Unbounded blast radius.

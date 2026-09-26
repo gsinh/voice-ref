@@ -59,7 +59,8 @@ class State(TypedDict, total=False):
     authenticated: bool
     intent: str | None
     intent_text: str  # what the customer said that set the intent
-    cards: dict[str, str]  # card_id -> description, active cards only
+    cards: dict[str, str]  # card_id -> description, all of the customer's cards
+    active_cards: list[str]
     target_card: str | None
     outcome: Outcome | None
 
@@ -228,36 +229,39 @@ async def load_cards(state: State, runtime: Rt) -> dict[str, Any]:
             cards = await deps.tools.call(customer_id, "get_card_status", {})
     except Exception:
         return _say("Sorry, I can't reach the card system right now.", "error")
-    active = {c["card_id"]: c["card"] for c in cards if c.get("status") == "active"}
+    every = {c["card_id"]: c["card"] for c in cards}
+    active = [c["card_id"] for c in cards if c.get("status") == "active"]
     if not active:
-        return {**_say("You don't have any active cards to block.", "answered"), "cards": {}}
-    return {"cards": active, "target_card": None}
+        return {**_say("All your cards are already blocked.", "answered"), "cards": every}
+    return {"cards": every, "active_cards": active, "target_card": None}
 
 
 async def choose_card(state: State, runtime: Rt) -> dict[str, Any]:
-    """One active card: that's the one. Several: let the customer's words decide, and ask
-    only if that isn't clear."""
+    """Which card? The customer's own words first, judged against *all* their cards, so
+    "my debit card" never turns into blocking a different card. If they didn't say, the
+    only active card is the one; with several, ask."""
     deps, rec = runtime.context.deps, runtime.context.recorder
     cards = state.get("cards", {})
-    if len(cards) == 1:
-        return {"target_card": next(iter(cards))}
+    active = state.get("active_cards", [])
 
-    question = questions.card_choice(deps.intent_threshold, cards)
-    # The words that started this request ("block my credit card"), not the latest
-    # message, which may be the one-time-code step in between.
-    decision = await deps.decisions.choose(question, state.get("intent_text", ""))
-    rec.decision("card", decision)
-    if decision.label:
-        return {"target_card": decision.label}
+    if len(cards) > 1:
+        # The words that started this request ("block my credit card"), not the latest
+        # message, which may be the one-time-code step in between.
+        named = await _which_card(deps, rec, cards, state.get("intent_text", ""))
+        if named is not None:
+            if named not in active:
+                return _say(f"Your {cards[named]} is already blocked.", "answered")
+            return {"target_card": named}
+    if len(active) == 1:
+        return {"target_card": active[0]}
 
-    options = " or ".join(f"your {d}" for d in cards.values())
-    prompt = f"Which card should I block: {options}?"
-    answer = str(interrupt({"kind": "card_choice", "prompt": prompt}))
-    decision = await deps.decisions.choose(question, answer)
-    rec.decision("card", decision)
-    transcript = [AIMessage(prompt), HumanMessage(answer)]
-    if decision.label:
-        return {"messages": transcript, "target_card": decision.label}
+    choices = {cid: cards[cid] for cid in active}
+    prompt = "Which card should I block: " + " or ".join(f"your {d}" for d in choices.values())
+    answer = str(interrupt({"kind": "card_choice", "prompt": prompt + "?"}))
+    named = await _which_card(deps, rec, choices, answer)
+    transcript = [AIMessage(prompt + "?"), HumanMessage(answer)]
+    if named is not None:
+        return {"messages": transcript, "target_card": named}
     return {
         "messages": [
             *transcript,
@@ -265,6 +269,16 @@ async def choose_card(state: State, runtime: Rt) -> dict[str, Any]:
         ],
         "outcome": "unclear",
     }
+
+
+async def _which_card(
+    deps: Deps, rec: TurnRecorder, cards: dict[str, str], text: str
+) -> str | None:
+    decision = await deps.decisions.choose(
+        questions.card_choice(deps.intent_threshold, cards), text
+    )
+    rec.decision("card", decision)
+    return decision.label if decision.label in cards else None
 
 
 async def confirm_block(state: State, runtime: Rt) -> dict[str, Any]:

@@ -43,11 +43,17 @@ def confirmation(threshold: float, action: str) -> Question:
     )
 
 
+UNSPECIFIED = "unspecified"
+
+
 def card_choice(threshold: float, cards: dict[str, str]) -> Question:
-    """cards: card_id -> description, e.g. 'Visa debit card ending 4821'."""
+    """cards: card_id -> description, e.g. 'Visa debit card ending 4821'.
+
+    Includes an explicit "unspecified" option: an LLM always picks *something*, so without
+    it "I lost my card" would silently select an arbitrary card."""
     return Question(
         name="card",
         instructions="Which of these cards is the customer talking about?",
-        options=cards,
+        options={**cards, UNSPECIFIED: "the customer did not say which card"},
         threshold=threshold,
     )

@@ -63,7 +63,12 @@ class KeywordDecisions:
             label = "confirm" if "yes" in t else "decline" if "no" in t else None
         elif question.name == "card":
             label = next(
-                (cid for cid, desc in question.options.items() if desc.split()[1] in t), None
+                (
+                    cid
+                    for cid, desc in question.options.items()
+                    if cid.startswith("CARD-") and desc.split()[1] in t
+                ),
+                "unspecified",
             )
         return Decision(label, 0.99 if label else 0.3, "system1", 1.0)
 
@@ -244,6 +249,28 @@ async def test_unclear_confirmation_twice_means_no() -> None:
     result = await chat.say("I'm not sure")
     assert result.outcome == "not_confirmed"
     assert tools.blocked == []
+
+
+async def test_naming_an_already_blocked_card_does_not_target_another() -> None:
+    service, tools, _ = make()
+    tools.cards[0]["status"] = "blocked"  # the debit card is already blocked
+    chat = Conversation(service)
+    await chat.say("I lost my debit card")
+    result = await chat.say(OTP)
+    assert result.outcome == "answered"
+    assert "debit card ending 4821 is already blocked" in result.reply
+    assert result.awaiting is None
+    assert tools.blocked == []
+
+
+async def test_unnamed_card_with_one_active_goes_straight_to_confirmation() -> None:
+    service, tools, _ = make()
+    tools.cards[1]["status"] = "blocked"
+    chat = Conversation(service)
+    await chat.say("I lost my card")
+    confirm = await chat.say(OTP)
+    assert confirm.awaiting == "confirmation"
+    assert "debit card ending 4821" in confirm.reply
 
 
 async def test_unclear_intent_asks_to_clarify() -> None:

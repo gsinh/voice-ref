@@ -39,7 +39,7 @@ fmt:             ## Auto-fix lint and formatting
 	$(UV) run ruff format .
 
 typecheck:       ## mypy (strict)
-	$(UV) run mypy apps modules
+	$(UV) run mypy apps libs modules
 
 test:            ## Backend tests (integration tests need TEST_DATABASE_URL)
 	$(UV) run pytest -q

@@ -1,10 +1,11 @@
+import Link from "next/link";
 import { connection } from "next/server";
 
 import { backendStatus } from "@/lib/backend";
 
 const phases = [
   { n: 0, name: "Skeleton", detail: "Modular monolith, Postgres, CI, ADRs", done: true },
-  { n: 1, name: "Core (text)", detail: "LangGraph, Laya, MCP, three use cases", done: false },
+  { n: 1, name: "Core (text)", detail: "LangGraph, Laya, MCP, three use cases", done: true },
   { n: 2, name: "Voice", detail: "LiveKit Cloud, Silero VAD, Whisper, Kokoro", done: false },
   { n: 3, name: "Production traits", detail: "Tracing, faults, fallback, Kestra, memory", done: false },
   { n: 4, name: "Evaluation", detail: "Intent, tools, groundedness, compliance", done: false },
@@ -28,6 +29,13 @@ export default async function Home() {
         A voice agent for a retail bank, built as an enterprise architecture problem: business
         outcomes, guardrails, latency, observability and cost.
       </p>
+
+      <Link
+        href="/chat"
+        className="mt-6 inline-block rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white"
+      >
+        Try the text chat →
+      </Link>
 
       <section className="mt-10">
         <div className="flex items-baseline justify-between gap-4">

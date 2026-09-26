@@ -12,13 +12,24 @@ system of record and the decision model, because those boundaries are the archit
 - **Modules** (`backend/modules/*`) are separate packages, each with its own settings,
   router, schema and migrations.
 - **The gateway** (`backend/apps/gateway`) is the composition root. It is the only code
-  that knows every module; it mounts them under `/api`, `/bank`, `/mcp` and `/decide`,
-  and runs `migrate` and `seed`.
+  that knows every module; it mounts them under `/api`, `/bank` and `/mcp`, runs the
+  `migrate` and `seed` admin commands, and launches sidecars.
+- **Shared kernels** (`backend/libs/*`) hold the few contracts two modules must agree on
+  exactly, e.g. `signed_tokens` (issued by the orchestrator, verified by MCP). They
+  depend on nothing of ours.
 - Boundaries are **enforced**, not hoped for: `lint-imports` fails CI if a module
-  imports another module or the gateway.
+  imports another module or the gateway, or a shared lib imports anything of ours.
 - Modules talk over their real protocols even in-process: the orchestrator uses MCP,
-  MCP calls the bank over HTTP (loopback, ~1 ms). The decision model is the exception:
-  it is called in-process through `DecisionPort` because it sits on the hot path.
+  MCP calls the bank over HTTP (loopback, ~1 ms).
+- Heavy or foreign runtimes run as **localhost sidecars** in the same container, not as
+  modules: Laya (PyTorch) now, agentgateway (Rust) in Phase 3.
+
+Phase 1 removed the planned `decision` module: Laya ships its own HTTP server, so a
+module wrapping it would only have been a pass-through. The orchestrator's
+`DecisionPort` calls the sidecar directly. (KISS: a module has to earn its place.)
+
+MCP is pinned to SDK 1.x for now: `langchain-mcp-adapters` does not support 2.x yet.
+The wire protocol is the same, so upgrading is a version bump.
 - Local and production use the **same layout**, so there is one topology to reason about.
 
 ## Alternatives considered
