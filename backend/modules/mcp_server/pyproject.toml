@@ -6,10 +6,13 @@ requires-python = ">=3.12,<3.13"
 dependencies = [
     "fastapi>=0.116",
     "pydantic-settings>=2.10",
-    "mcp>=2.2",
+    "mcp>=1.24,<2",
     "httpx>=0.28",
-    "pyjwt>=2.10",
+    "signed-tokens",
 ]
+
+[tool.uv.sources]
+signed-tokens = { workspace = true }
 
 [build-system]
 requires = ["hatchling"]

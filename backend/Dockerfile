@@ -16,13 +16,14 @@ WORKDIR /app
 # Dependencies first, so editing code doesn't invalidate the dependency layer.
 COPY pyproject.toml uv.lock ./
 COPY apps/gateway/pyproject.toml apps/gateway/pyproject.toml
+COPY libs/signed_tokens/pyproject.toml libs/signed_tokens/pyproject.toml
 COPY modules/banking_api/pyproject.toml modules/banking_api/pyproject.toml
-COPY modules/decision/pyproject.toml modules/decision/pyproject.toml
 COPY modules/mcp_server/pyproject.toml modules/mcp_server/pyproject.toml
 COPY modules/orchestrator/pyproject.toml modules/orchestrator/pyproject.toml
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --no-dev --no-install-workspace --package gateway
 COPY apps apps
+COPY libs libs
 COPY modules modules
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --no-dev --no-editable --package gateway

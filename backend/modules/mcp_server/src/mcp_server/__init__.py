@@ -1,9 +1,6 @@
-"""MCP server: the only way the LLM reaches bank data (ADR-0006).
+"""MCP server: the only way the LLM reaches bank data (ADR-0006)."""
 
-Phase 1 mounts the FastMCP tools.
-"""
-
-from mcp_server.router import create_router
+from mcp_server.server import BLOCK_CARD, McpComponent, create_mcp
 from mcp_server.settings import Settings
 
-__all__ = ["Settings", "create_router"]
+__all__ = ["BLOCK_CARD", "McpComponent", "Settings", "create_mcp"]

@@ -1,0 +1,13 @@
+[project]
+name = "signed-tokens"
+version = "0.1.0"
+description = "Shared kernel: the signed session and confirmation tokens the orchestrator issues and the MCP server verifies."
+requires-python = ">=3.12,<3.13"
+dependencies = ["pyjwt>=2.10"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/signed_tokens"]

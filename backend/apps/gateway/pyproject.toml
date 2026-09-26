@@ -9,14 +9,12 @@ dependencies = [
     "psycopg[binary]>=3.2",
     "uvicorn[standard]>=0.35",
     "banking-api",
-    "decision",
     "mcp-server",
     "orchestrator",
 ]
 
 [tool.uv.sources]
 banking-api = { workspace = true }
-decision = { workspace = true }
 mcp-server = { workspace = true }
 orchestrator = { workspace = true }
 

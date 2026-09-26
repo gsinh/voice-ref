@@ -5,7 +5,6 @@ from dataclasses import dataclass
 from fastapi import FastAPI
 
 import banking_api
-import decision
 import mcp_server
 import orchestrator
 from gateway.health import ReadinessCheck, postgres_check
@@ -17,7 +16,6 @@ class ModuleSettings:
     bank: banking_api.Settings
     orchestrator: orchestrator.Settings
     mcp: mcp_server.Settings
-    decision: decision.Settings
 
     @classmethod
     def from_env(cls) -> "ModuleSettings":
@@ -25,7 +23,6 @@ class ModuleSettings:
             bank=banking_api.Settings(),
             orchestrator=orchestrator.Settings(),
             mcp=mcp_server.Settings(),
-            decision=decision.Settings(),
         )
 
 
@@ -34,15 +31,17 @@ PREFIXES = {
     "orchestrator": "/api",
     "banking_api": "/bank",
     "mcp_server": "/mcp",
-    "decision": "/decide",
 }
 
 
-def mount_modules(app: FastAPI, ms: ModuleSettings) -> None:
+def build_mcp(ms: ModuleSettings) -> mcp_server.McpComponent:
+    return mcp_server.create_mcp(ms.mcp)
+
+
+def mount_modules(app: FastAPI, ms: ModuleSettings, mcp: mcp_server.McpComponent) -> None:
     app.include_router(orchestrator.create_router(ms.orchestrator), prefix=PREFIXES["orchestrator"])
     app.include_router(banking_api.create_router(ms.bank), prefix=PREFIXES["banking_api"])
-    app.include_router(mcp_server.create_router(ms.mcp), prefix=PREFIXES["mcp_server"])
-    app.include_router(decision.create_router(ms.decision), prefix=PREFIXES["decision"])
+    app.mount(PREFIXES["mcp_server"], mcp.app)
 
 
 def readiness_checks(ms: ModuleSettings) -> dict[str, ReadinessCheck]:

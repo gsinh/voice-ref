@@ -42,7 +42,5 @@ def test_all_modules_are_mounted() -> None:
         "orchestrator": "/api",
         "banking_api": "/bank",
         "mcp_server": "/mcp",
-        "decision": "/decide",
     }
-    for prefix in ("/api", "/bank", "/mcp", "/decide"):
-        assert client.get(f"{prefix}/").json()["status"] == "skeleton"
+    assert client.get("/api/").json()["status"] == "skeleton"
