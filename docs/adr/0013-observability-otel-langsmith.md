@@ -9,7 +9,8 @@ the models decided, token usage, errors and retries.
 
 ## Decision
 - **OpenTelemetry** spans for every stage (VAD end, STT, decision, LLM, tool, TTS first
-  audio), exported through a collector.
+  audio), exported over OTLP to an endpoint set by env (no self-hosted collector on the
+  free tier).
 - **LangSmith** for LLM-level traces and eval experiments (free developer tier,
   optional: with no key, OTel only).
 - A compact **per-turn metrics row** in Postgres feeds the in-app `/observability`

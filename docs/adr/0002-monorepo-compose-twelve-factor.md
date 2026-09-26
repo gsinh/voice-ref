@@ -4,15 +4,15 @@
 - **Date:** 2026-09-26
 
 ## Context
-Six services (orchestrator, MCP server, banking API, decision service, voice worker,
-web) plus Postgres and Kestra must run the same way on an M4 Mac and on a production VPS,
-by one person.
+A backend (orchestrator, MCP server, banking API, decision service, voice worker), a web
+app, Postgres and Kestra must run the same way on an M4 Mac and in production, built and
+operated by one person.
 
 ## Decision
-- One repository. Python services share a **uv workspace** and a small `libs/common`
-  package (settings base, JSON logging, health endpoints).
-- One `compose.yaml`. **Profiles** select what runs: `core` now; `voice`, `workflows`,
-  `local-ai` are added in the phase that needs them.
+- One repository. The backend is a **uv workspace** (`backend/`) whose modules deploy as
+  one process (ADR-0015); the web app lives in `web/`.
+- One `compose.yaml` for local development. Core services always start; optional ones
+  (`workflows`, `voice`) join behind profiles in the phase that needs them.
 - **12-factor** configuration: every setting comes from the environment through
   `pydantic-settings`; `.env.example` documents all of them. Services are stateless,
   log JSON to stdout, and shut down cleanly on SIGTERM.
@@ -23,9 +23,8 @@ by one person.
   to Kubernetes later if needed.
 
 ## Consequences
-Dev/prod parity: production runs the same images and the same compose file with a
-different `.env`. A shared lib creates coupling, so it stays deliberately tiny:
-infrastructure helpers only, no domain code.
+Dev/prod parity: the backend image that runs locally is the image the HF Space builds;
+only environment variables differ (ADR-0016).
 
 ## Principle
 **12-factor** (config, backing services, processes, disposability, dev/prod parity,

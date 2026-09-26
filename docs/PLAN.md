@@ -46,34 +46,28 @@ A large Indian retail bank handles millions of calls a month through a menu-driv
 ## 4. Architecture
 
 ```
-                                CUSTOMER (browser mic)
-                                        │ WebRTC
-                                        ▼
-                               LiveKit Cloud (media edge)
-                                        │
-┌───────────────────────── Hetzner VPS (docker compose) ─────────────────────────┐
-│                                       ▼                                         │
-│   voice_agent ── Silero VAD ── STT (Groq Whisper) ── TTS (Kokoro)               │
-│        │                                                                        │
-│        ▼  same graph as the text path                                           │
-│   orchestrator (FastAPI + LangGraph)                                            │
-│     auth_gate → memory_recall → decide (Laya: safety, intent, risk)             │
-│        │                               │ low confidence                         │
-│        │                               └──► Llama fallback (System 2)           │
-│        ▼                                                                        │
-│     account_agent | card_agent | general_agent   (Llama via Groq / Ollama)      │
-│        │                                                                        │
-│        │  card_agent: policy → interrupt("confirm?") → Laya yes/no → token      │
-│        ▼                                                                        │
-│   mcp_server (FastMCP) ──► banking_api (FastAPI) ──► Postgres (mock bank)       │
-│                                                                                 │
-│   decision (Laya System-1 model, ONNX)          Postgres: checkpoints, metrics, │
-│   kestra (async workflows)                                audit, memory         │
-│   web (Next.js SSR, BFF)                                                        │
-└─────────────────────────────────────────────────────────────────────────────────┘
-        ▲ Cloudflare Tunnel + Access (no open ports)
-        │
-   Outbound only: Groq · LiveKit Cloud · LangSmith · Synap
+ CUSTOMER (browser)
+   │  HTTPS                                   │ WebRTC audio
+   ▼                                          ▼
+ Next.js SSR — Cloudflare Workers (BFF)     LiveKit Cloud (media edge near the user)
+   │  server-to-server, HF token                ▲
+   ▼                                            │ outbound
+┌──────────── Hugging Face Space: backend (private, Docker) ─────────────────────┐
+│  process 1: gateway (FastAPI) — modular monolith                                │
+│    /api     orchestrator  LangGraph: auth_gate → memory_recall → decide         │
+│                           → account | card | general agent → respond           │
+│    /decide  decision      Laya System-1 (in-process, ONNX)                      │
+│    /mcp     mcp_server    FastMCP tools  ──HTTP──►  /bank                       │
+│    /bank    banking_api   mock system of record                                 │
+│  process 2: voice worker  Silero VAD · Groq Whisper · Kokoro TTS  (Phase 2)     │
+└──────────────────────────────────────────────────────────────────────────────────┘
+        │                          │                          │
+        ▼                          ▼                          ▼
+  Neon Postgres (free)     Kestra — second HF Space     Groq · LangSmith · Synap
+  bank, orchestrator,      (open source, Neon DB)       (outbound APIs)
+  kestra databases         async flows, schedules
+
+  Cloudflare cron trigger ── keep-alive pings to both Spaces
 ```
 
 ### System 1 / System 2
@@ -134,81 +128,91 @@ The voice turn does the minimum synchronously. Everything durable and slow runs 
 | Tools | MCP (FastMCP, streamable HTTP) + `langchain-mcp-adapters` | — |
 | TTS | Kokoro | Piper |
 | Memory | Synap | LangGraph `PostgresStore` |
-| Workflows | Kestra (self-hosted) | — |
+| Workflows | Kestra open source, in its own HF Space | Local container (`workflows` profile) |
 | Tracing | LangSmith + OpenTelemetry | OTel only |
-| Backend | FastAPI (Python 3.12, uv) | — |
-| Frontend | Next.js (App Router, SSR, BFF) | — |
-| Data | Postgres 17 | — |
-| Delivery | GitHub Actions → GHCR (multi-arch) → Hetzner | — |
-| Edge | Cloudflare Tunnel + Access | — |
+| Backend | FastAPI modular monolith (Python 3.12, uv) | — |
+| Frontend | Next.js (App Router, SSR, BFF) on Cloudflare Workers | Container locally; Vercel Hobby if Workers limits bite |
+| Data | Neon Postgres (free tier) | Postgres 17 container locally |
+| Delivery | GitHub Actions → HF Space git repos + `wrangler` to Workers | — |
+| Edge | Cloudflare Workers (web), private HF Space (backend) | — |
 
 ## 6. Architecture principles, and where each one appears
 
 | Principle | Where it appears |
 |---|---|
-| **KISS / YAGNI** | Use LangChain's model abstraction and LiveKit's plugins instead of wrapping them. Three agents, not ten. A compose profile appears only in the phase that needs it. |
+| **KISS / YAGNI** | Use LangChain's model abstraction and LiveKit's plugins instead of wrapping them. Three agents, not ten. One deployable backend. A compose profile appears only in the phase that needs it. |
 | **12-Factor** | Config in env (`pydantic-settings`), backing services attached by URL, stateless processes (state in Postgres), JSON logs to stdout, graceful SIGTERM, same images in dev and prod, one-off admin jobs via `docker compose run`. |
 | **SRP** | One job per module: router routes, policy decides, tools act, audit records. |
 | **OCP** | New agent = new graph node; new provider = new config value. |
 | **LSP / ISP** | Small ports (`DecisionPort`, `MemoryPort`, `BankingPort`, `FaultInjector`) with interchangeable adapters. |
 | **DIP / Hexagonal** | Domain code depends on ports; a composition root wires adapters. |
-| **Least privilege** | LLM sees tools, not data; high-risk tools need a token; each service has its own DB role. |
+| **Least privilege** | LLM sees tools, not data; high-risk tools need a token; each module has its own DB role and schema; the backend Space is private. |
 | **Fail fast, degrade gracefully** | Timeouts, circuit breakers, fallback controller. |
-| **Idempotency** | Sensitive tools take an idempotency key. |
+| **Idempotency** | Sensitive tools take an idempotency key; migrations and seeding are re-runnable. |
+| **Modular monolith** | Modules are separate packages that never import each other (enforced by `lint-imports`) and talk over HTTP/MCP, deployed as one process. |
 
 ## 7. Repository layout
 
 ```
 voice-ref/
-├── compose.yaml               # profiles grow phase by phase
+├── compose.yaml               # local stack: postgres, migrate, backend, web
 ├── .env.example               # every setting, documented
-├── Makefile                   # the commands a contributor runs
-├── pyproject.toml             # uv workspace root + shared ruff/mypy/pytest config
-├── libs/common/               # shared: settings base, JSON logging, health router
-├── services/
-│   ├── orchestrator/          # FastAPI + LangGraph
-│   ├── mcp_server/            # FastMCP banking tools
-│   ├── banking_api/           # mock bank system of record
-│   ├── decision/              # Laya System-1 service
-│   ├── voice_agent/           # LiveKit worker          (Phase 2)
-│   └── web/                   # Next.js SSR
+├── Makefile                   # the commands a contributor runs (CI runs the same)
+├── backend/                   # uv workspace; this folder is what the HF Space builds
+│   ├── Dockerfile             # one image: serve | migrate | seed
+│   ├── apps/gateway/          # composition root, health, migration runner, CLI
+│   └── modules/
+│       ├── orchestrator/      # LangGraph                → /api
+│       ├── banking_api/       # mock bank (schema bank)  → /bank
+│       ├── mcp_server/        # MCP tools                → /mcp
+│       └── decision/          # Laya System-1            → /decide
+├── web/                       # Next.js SSR BFF
 ├── infra/
-│   ├── postgres/init/         # schemas, roles, seed data
-│   └── kestra/flows/          #                        (Phase 3)
-├── evals/                     #                        (Phase 4)
+│   ├── postgres/              # one-time role/schema bootstrap (local + Neon)
+│   └── kestra/                # Kestra Space + flows     (Phase 3)
+├── evals/                     #                          (Phase 4)
 ├── docs/
 │   ├── PLAN.md
 │   └── adr/
-└── .github/workflows/
+└── .github/workflows/         # ci.yml now; deploy workflows in Phase 5
 ```
 
 ## 8. Phases
 
 | Phase | Build | Done when |
 |---|---|---|
-| **0. Skeleton** | Layout, uv workspace, shared lib, service stubs with health checks, Postgres schemas + seed data, Next.js shell, compose `core` profile, CI (lint, typecheck, test, image build), ADRs | `make up` starts everything healthy; CI green |
+| **0. Skeleton** ✓ | Modular-monolith backend (gateway + 4 module stubs), health checks, per-module roles/schemas, migration runner, seed data, Next.js SSR status page, compose, CI (lint, boundaries, typecheck, tests, image builds), ADRs | `make up` starts everything healthy; CI green |
 | **1. Core (text)** | Banking API, MCP tools, Laya decision service, LangGraph graph (auth, routing, 3 agents, interrupt-based confirmation, confirmation token), mock OTP, `/chat` | All three use cases work in text on Groq and on Ollama |
 | **2. Voice** | Voice worker (LiveKit Cloud, Silero, Groq Whisper, Kokoro), `/call`, `latency-probe` | All three use cases work by voice; per-stage latency captured |
-| **3. Production traits** | OTel + LangSmith, `/observability`, fault toggles, fallback controller, human handoff, audit log, Kestra (`workflows` profile), memory (Synap + Postgres adapter) | Every fault degrades gracefully; latency visible per turn |
+| **3. Production traits** | OTel + LangSmith, `/observability`, fault toggles, fallback controller, human handoff, audit log, Kestra (`workflows` profile locally, own HF Space in production), memory (Synap + Postgres adapter) | Every fault degrades gracefully; latency visible per turn |
 | **4. Evaluation** | ~80-case dataset incl. Hindi/Hinglish; intent, tool-choice, task completion, groundedness, sensitive-action compliance; Laya vs Llama; Groq vs Ollama; `/evals` | `make eval` produces a report; nightly Kestra run |
-| **5. Ship** | Multi-arch images to GHCR, Hetzner CAX21 (EU), Cloudflare Tunnel + Access, deploy workflow, `/cost`, `/architecture`, demo script, recording | Public URL always on; 5-minute demo rehearsed |
+| **5. Ship** | Neon project + bootstrap, backend and Kestra Spaces, web on Cloudflare Workers (OpenNext), keep-alive cron, deploy workflows, `/cost`, `/architecture`, demo script, recording | Public URL up without a laptop; 5-minute demo rehearsed |
 
-## 9. Deployment
+## 9. Deployment: all free tiers (ADR-0016)
 
-- **Local (M4, 16 GB)**: OrbStack (or Docker Desktop) with ~8 GB for the VM. Ollama
-  runs natively on macOS for Metal acceleration; containers reach it at
-  `host.docker.internal:11434`. Groq + LiveKit Cloud are the defaults, so the local stack
-  stays light.
-- **Production**: one Hetzner CAX21 (ARM64, EU — same architecture as the Mac). The same
-  compose file, images pulled from GHCR, secrets in a root-only `.env`. Cloudflare Tunnel
-  exposes it with no inbound ports; Cloudflare Access gates the live demo.
-- **Why EU and not India**: each turn makes several sequential calls to Groq (US/EU),
-  but only one audio round trip, and LiveKit Cloud's edge is already near the user.
-  Putting the worker near the model APIs wins. Validated by the `latency-probe`
-  (ADR-0012).
+| Component | Where | Free-tier notes |
+|---|---|---|
+| Web (Next.js SSR BFF) | Cloudflare Workers via OpenNext | Free plan limits on CPU per request and bundle size; Vercel Hobby is the fallback |
+| Backend + voice worker | Hugging Face Space (Docker, 2 vCPU / 16 GB), **private** | Sleeps after ~48 h without traffic; one exposed port (7860) |
+| Workflows | Kestra open source in a second HF Space | Same sleep rule; uses its own Neon database |
+| Database | Neon Postgres | Scales to zero; first query after idle is slower |
+| Media, LLM, STT | LiveKit Cloud, Groq | Free-tier quotas |
+| Tracing, memory | LangSmith, Synap | Optional; the system runs without them |
+| Keep-alive | Cloudflare Workers cron trigger | Pings both Spaces' `/healthz` |
+
+- **Local (M4, 16 GB)**: `make up` runs Postgres, the backend and the web app in Docker
+  (OrbStack or Docker Desktop). Ollama runs natively on macOS for Metal acceleration and
+  containers reach it at `host.docker.internal:11434`.
+- **Security**: the browser only talks to the Workers BFF and LiveKit. The backend Space
+  is private; the BFF calls it with a Hugging Face read token held as a Worker secret.
+  Kestra calls back into the backend with HMAC-signed webhooks.
+- **Latency**: HF Spaces and Neon (same region) sit in the US next to Groq, where every
+  turn makes several sequential model calls; LiveKit Cloud keeps the audio edge near
+  users in India. Measured by the `latency-probe` in Phase 2.
+- **Trade-off, stated plainly**: $0 buys a system that can sleep. A ~€5–8/month VPS
+  running the same compose file is the upgrade path (ADR-0012 records that design).
 - **Production for a real Indian bank** would move to an Indian region with in-country
-  models to satisfy RBI data-localisation rules. That is a configuration change, not a
-  code change.
+  models to satisfy RBI data-localisation rules: a configuration change, not a code change.
 
 ## 10. The five-minute demo
 

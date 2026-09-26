@@ -10,8 +10,9 @@ must retry, and must not be lost. The same holds for post-call analytics, human
 handoff cases, nightly evals and backups.
 
 ## Decision
-The voice turn does the minimum synchronously and emits an event. **Kestra** (self-hosted,
-`workflows` profile) runs durable flows triggered by webhook or schedule:
+The voice turn does the minimum synchronously and emits an event. **Kestra** (open
+source; `workflows` compose profile locally, its own Hugging Face Space with a Neon
+database in production) runs durable flows triggered by webhook or schedule:
 `lost_card_followup`, `post_call_processing`, `human_handoff`, `nightly_evals`,
 `db_backup`. Webhooks are signed with a shared secret.
 
@@ -21,7 +22,8 @@ The voice turn does the minimum synchronously and emits an event. **Kestra** (se
 
 ## Consequences
 Clear sync/async split, retries and a UI for free. Kestra is JVM-based (~1.5 GB RAM),
-so it gets its own profile and a heap cap.
+so it gets its own profile and a heap cap. On a free Space it can sleep, so scheduled
+flows are best-effort; the keep-alive cron (ADR-0016) reduces that risk.
 
 ## Principle
 Keep the **hot path minimal**; make slow work **durable and observable**.

@@ -8,13 +8,21 @@ We need a mock bank database, LangGraph checkpoints, per-turn metrics, an audit 
 local memory store and a database for Kestra.
 
 ## Decision
-One **Postgres** instance. Each service gets its **own schema and its own role**
-(`bank`, `orchestrator`, …) and can only touch what it owns. Kestra gets its own
-database. Schemas, roles and seed data live in `infra/postgres/init/`.
+One **Postgres**: a container locally, **Neon** (free tier) in production. Each module
+gets its **own schema and its own login role** (`bank`, `orchestrator`, …) and can only
+touch what it owns. Kestra gets its own database.
+
+- `infra/postgres/bootstrap.sql` is the only admin step: it creates the roles and
+  schemas, once per environment.
+- Each module ships its own forward-only SQL migrations and runs them **as its own
+  role** (`python -m gateway migrate`), so it can never alter another module's schema.
+- Demo data is a separate, idempotent `seed` command that can be re-run at any time.
 
 ## Alternatives considered
-- **SQLite files.** Simple for one process, awkward when several containers share them.
-- **A database per service.** Correct at scale, too heavy for one 8 GB VPS.
+- **SQLite files.** Simple for one process, but a Space's disk is not persistent.
+- **A database per module.** Correct at scale, more than the free tier needs.
+- **Alembic.** Solid, but assumes SQLAlchemy models; plain SQL files plus a ~60-line
+  runner are enough and easier to read.
 
 ## Consequences
 One thing to back up and monitor. Service boundaries are still enforced by grants, so

@@ -7,7 +7,7 @@ ADR that supersedes the old one rather than editing history.
 | # | Decision | Status |
 |---|---|---|
 | [0001](0001-record-architecture-decisions.md) | Record architecture decisions | Accepted |
-| [0002](0002-monorepo-compose-twelve-factor.md) | Monorepo, Compose profiles, 12-factor config | Accepted |
+| [0002](0002-monorepo-compose-twelve-factor.md) | Monorepo, Compose for local dev, 12-factor config | Accepted |
 | [0003](0003-cascaded-voice-pipeline.md) | Cascaded STT → LLM → TTS over speech-to-speech | Accepted |
 | [0004](0004-langgraph-orchestration.md) | LangGraph, one graph for text and voice | Accepted |
 | [0005](0005-system1-system2-laya-llama.md) | System 1 / System 2: Laya decides, Llama talks | Accepted (latency to validate) |
@@ -17,8 +17,10 @@ ADR that supersedes the old one rather than editing history.
 | [0009](0009-kestra-async-workflows.md) | Kestra for async work, off the voice path | Accepted |
 | [0010](0010-memory-is-not-system-of-record.md) | Memory is context, never a system of record | Accepted |
 | [0011](0011-nextjs-ssr-bff.md) | Next.js SSR as a backend-for-frontend | Accepted |
-| [0012](0012-hetzner-eu-cloudflare-tunnel.md) | One Hetzner EU VPS behind Cloudflare Tunnel | Accepted (region to validate) |
+| [0012](0012-hetzner-eu-cloudflare-tunnel.md) | One Hetzner EU VPS behind Cloudflare Tunnel | Superseded by 0016 |
 | [0013](0013-observability-otel-langsmith.md) | OpenTelemetry plus LangSmith | Accepted |
 | [0014](0014-ports-only-where-needed.md) | Ports and adapters only where a second adapter exists | Accepted |
+| [0015](0015-modular-monolith.md) | Modular monolith: independent modules, one process | Accepted |
+| [0016](0016-free-tier-deployment.md) | Free-tier deployment: HF Spaces, Neon, Cloudflare Workers | Accepted |
 
 Template: [`template.md`](template.md).

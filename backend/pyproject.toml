@@ -1,0 +1,70 @@
+# uv workspace root for the backend modular monolith (ADR-0015).
+# The gateway and each module are members with their own pyproject.toml.
+# Shared tooling config (ruff, mypy, pytest) lives here so every member is checked the same way.
+[project]
+name = "voice-ref-backend"
+version = "0.1.0"
+requires-python = ">=3.12,<3.13"
+
+[tool.uv]
+package = false
+
+[tool.uv.workspace]
+members = ["apps/*", "modules/*"]
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28",
+    "import-linter>=2.3",
+    "mypy>=1.17",
+    "pytest>=8.4",
+    "pytest-asyncio>=1.1",
+    "ruff>=0.12",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "ASYNC", "S", "N", "RUF"]
+ignore = ["S104"]  # binding to 0.0.0.0 is intended inside containers
+
+[tool.ruff.lint.isort]
+known-first-party = ["gateway", "orchestrator", "banking_api", "mcp_server", "decision"]
+
+[tool.ruff.lint.per-file-ignores]
+"**/tests/**" = ["S101"]  # assert is how pytest works
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+plugins = ["pydantic.mypy"]
+explicit_package_bases = true
+mypy_path = [
+    "apps/gateway/src",
+    "modules/orchestrator/src",
+    "modules/banking_api/src",
+    "modules/mcp_server/src",
+    "modules/decision/src",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+addopts = "--import-mode=importlib"
+
+# Module boundaries, enforced in CI (ADR-0015). Run: uv run lint-imports
+[tool.importlinter]
+root_packages = ["gateway", "orchestrator", "banking_api", "mcp_server", "decision"]
+
+[[tool.importlinter.contracts]]
+name = "Modules are independent of each other"
+type = "independence"
+modules = ["orchestrator", "banking_api", "mcp_server", "decision"]
+
+[[tool.importlinter.contracts]]
+name = "Modules never import the gateway"
+type = "forbidden"
+source_modules = ["orchestrator", "banking_api", "mcp_server", "decision"]
+forbidden_modules = ["gateway"]

@@ -1,22 +1,17 @@
-# Core services start with a plain `docker compose up`. Optional services join later
-# phases behind profiles (voice, workflows, local-ai) — added only when needed (YAGNI).
+# Local stack. Mirrors production: one backend process (the HF Space), Postgres (Neon in
+# production) and the Next.js BFF (Cloudflare Workers in production). Optional services
+# join later behind profiles (workflows, voice), only when a phase needs them (YAGNI).
 #
-# Every setting comes from .env (12-factor). Host ports bind to 127.0.0.1 only: in
-# production Cloudflare Tunnel connects locally, so nothing is exposed publicly.
+# Every setting comes from .env (12-factor). Host ports bind to 127.0.0.1 only.
 
-x-python-service: &python-service
-  restart: unless-stopped
-  stop_grace_period: 15s
-  environment: &python-env
+x-backend: &backend
+  image: ${IMAGE_PREFIX:-voiceref}/backend:${IMAGE_TAG:-dev}
+  build: { context: backend }
+  environment:
     ENVIRONMENT: ${ENVIRONMENT:-local}
     LOG_LEVEL: ${LOG_LEVEL:-INFO}
-    PORT: "8000"
-  healthcheck:
-    test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/healthz', timeout=2)"]
-    interval: 10s
-    timeout: 3s
-    retries: 5
-    start_period: 10s
+    BANK_DATABASE_URL: postgresql://bank_api:${BANK_DB_PASSWORD}@postgres:5432/voiceref
+    ORCHESTRATOR_DATABASE_URL: postgresql://orchestrator:${ORCHESTRATOR_DB_PASSWORD}@postgres:5432/voiceref
 
 services:
   postgres:
@@ -31,6 +26,7 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./infra/postgres/init:/docker-entrypoint-initdb.d:ro
+      - ./infra/postgres/bootstrap.sql:/bootstrap/bootstrap.sql:ro
     ports:
       - "127.0.0.1:${POSTGRES_HOST_PORT:-5432}:5432"
     healthcheck:
@@ -39,76 +35,43 @@ services:
       timeout: 3s
       retries: 10
 
-  banking_api:
-    <<: *python-service
-    image: ${IMAGE_PREFIX:-voiceref}/banking_api:${IMAGE_TAG:-dev}
-    build:
-      context: .
-      dockerfile: services/python.Dockerfile
-      args: { SERVICE: banking_api, PACKAGE: banking-api }
-    environment:
-      <<: *python-env
-      SERVICE_NAME: banking_api
-      DATABASE_URL: postgresql://bank_api:${BANK_DB_PASSWORD}@postgres:5432/voiceref
-    ports: ["127.0.0.1:8001:8000"]
+  # One-off admin process (12-factor, XII): migrate, then reset the demo data.
+  migrate:
+    <<: *backend
+    command: ["migrate", "seed"]
+    restart: "no"
     depends_on:
       postgres: { condition: service_healthy }
 
-  mcp_server:
-    <<: *python-service
-    image: ${IMAGE_PREFIX:-voiceref}/mcp_server:${IMAGE_TAG:-dev}
-    build:
-      context: .
-      dockerfile: services/python.Dockerfile
-      args: { SERVICE: mcp_server, PACKAGE: mcp-server }
-    environment:
-      <<: *python-env
-      SERVICE_NAME: mcp_server
-      BANKING_API_URL: http://banking_api:8000
-    ports: ["127.0.0.1:8002:8000"]
-
-  decision:
-    <<: *python-service
-    image: ${IMAGE_PREFIX:-voiceref}/decision:${IMAGE_TAG:-dev}
-    build:
-      context: .
-      dockerfile: services/python.Dockerfile
-      args: { SERVICE: decision, PACKAGE: decision }
-    environment:
-      <<: *python-env
-      SERVICE_NAME: decision
-    ports: ["127.0.0.1:8003:8000"]
-
-  orchestrator:
-    <<: *python-service
-    image: ${IMAGE_PREFIX:-voiceref}/orchestrator:${IMAGE_TAG:-dev}
-    build:
-      context: .
-      dockerfile: services/python.Dockerfile
-      args: { SERVICE: orchestrator, PACKAGE: orchestrator }
-    environment:
-      <<: *python-env
-      SERVICE_NAME: orchestrator
-      DATABASE_URL: postgresql://orchestrator:${ORCHESTRATOR_DB_PASSWORD}@postgres:5432/voiceref
-    ports: ["127.0.0.1:8000:8000"]
+  backend:
+    <<: *backend
+    restart: unless-stopped
+    stop_grace_period: 15s
+    ports: ["127.0.0.1:${BACKEND_HOST_PORT:-7860}:7860"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:7860/healthz', timeout=2)"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
     depends_on:
-      postgres: { condition: service_healthy }
+      migrate: { condition: service_completed_successfully }
 
   web:
     image: ${IMAGE_PREFIX:-voiceref}/web:${IMAGE_TAG:-dev}
-    build: { context: services/web }
+    build: { context: web }
     restart: unless-stopped
     environment:
-      ORCHESTRATOR_URL: http://orchestrator:8000
-      BANKING_API_URL: http://banking_api:8000
-      MCP_SERVER_URL: http://mcp_server:8000
-      DECISION_URL: http://decision:8000
+      BACKEND_URL: http://backend:7860
+      # BACKEND_TOKEN is only needed for the private HF Space in production.
     ports: ["127.0.0.1:${WEB_HOST_PORT:-3000}:3000"]
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/api/healthz"]
       interval: 10s
       timeout: 3s
       retries: 5
+    depends_on:
+      backend: { condition: service_healthy }
 
 volumes:
   pgdata:

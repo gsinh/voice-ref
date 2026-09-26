@@ -1,6 +1,7 @@
 # 0012. One Hetzner EU VPS behind Cloudflare Tunnel
 
-- **Status:** Accepted (region to validate with `latency-probe` in Phase 2)
+- **Status:** Superseded by [0016](0016-free-tier-deployment.md): the owner chose a $0 deployment.
+  Kept as the documented upgrade path if always-on without sleeping becomes a requirement.
 - **Date:** 2026-09-26
 
 ## Context
