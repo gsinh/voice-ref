@@ -17,6 +17,12 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from orchestrator.ports import Decision, DecisionPort, Question
 
 
+def _describe(exc: Exception) -> str:
+    """Error type plus a short message, so the trace says *why* (e.g. model not found)."""
+    message = str(exc).strip().splitlines()[0][:160] if str(exc).strip() else ""
+    return f"{type(exc).__name__}: {message}" if message else type(exc).__name__
+
+
 def _ms(start: float) -> float:
     return round((time.perf_counter() - start) * 1000, 1)
 
@@ -99,10 +105,10 @@ class CascadeDecision:
                     f" < {question.threshold}: escalating"
                 )
             except Exception as exc:  # degrade, don't fail the turn
-                notes.append(f"system1 unavailable ({type(exc).__name__}): escalating")
+                notes.append(f"system1 unavailable ({_describe(exc)}): escalating")
         try:
             second = await self._fallback.choose(question, text)
             return Decision(second.label, second.confidence, second.source, _ms(start), notes)
         except Exception as exc:
-            notes.append(f"llm unavailable ({type(exc).__name__})")
+            notes.append(f"llm unavailable ({_describe(exc)})")
             return Decision(None, None, "none", _ms(start), notes)

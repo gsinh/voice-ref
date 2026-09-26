@@ -32,8 +32,15 @@ export async function backendFetch(
 export type Check = { name: string; ok: boolean; detail: string };
 
 export type AiStatus = {
-  llm: { model: string; endpoint: string | null; configured: boolean };
-  system1: { enabled: boolean; reachable?: boolean };
+  llm: {
+    model: string;
+    endpoint: string | null;
+    configured: boolean;
+    available?: boolean;
+    problem?: string;
+    offered?: string[];
+  };
+  system1: { enabled: boolean; reachable?: boolean; problem?: string };
 };
 
 export type BackendStatus = {

@@ -29,7 +29,9 @@ export default async function ChatPage() {
           <div>
             <dt className="uppercase tracking-wide">System 2</dt>
             <dd className="font-mono text-zinc-800 dark:text-zinc-200">
-              {ai ? `${ai.llm.model}${ai.llm.configured ? "" : " (no key)"}` : "unknown"}
+              {!ai
+                ? "unknown"
+                : `${ai.llm.model}${!ai.llm.configured ? " (no key)" : ai.llm.available === false ? " (unavailable)" : ""}`}
             </dd>
           </div>
           <div>
@@ -46,6 +48,26 @@ export default async function ChatPage() {
           </div>
         </dl>
       </header>
+      {ai?.llm.available === false && (
+        <div role="alert" className="mt-4 rounded-md bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-100">
+          <p>
+            <strong>System 2 can&apos;t be used:</strong> <code>{ai.llm.model}</code> at{" "}
+            {ai.llm.endpoint}: {ai.llm.problem}. Set <code>LLM_MODEL</code> in <code>.env</code>{" "}
+            and restart the backend.
+          </p>
+          {ai.llm.offered && ai.llm.offered.length > 0 && (
+            <p className="mt-1 break-words text-xs">
+              Offered: <code>{ai.llm.offered.join(", ")}</code>
+            </p>
+          )}
+        </div>
+      )}
+      {ai?.system1.enabled && ai.system1.reachable === false && (
+        <p className="mt-2 text-xs text-zinc-500">
+          System 1 (Laya) is {ai.system1.problem}. Decisions fall back to the LLM meanwhile;
+          check <code>docker compose logs backend</code>.
+        </p>
+      )}
       {!status.reachable && (
         <p role="alert" className="mt-4 rounded-md bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-950 dark:text-amber-200">
           The backend is unreachable ({status.error}). Start it with <code>make up</code>.

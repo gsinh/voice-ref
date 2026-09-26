@@ -119,24 +119,48 @@ def create_router(settings: Settings) -> APIRouter:
 
     @router.get("/status")
     async def status() -> dict[str, Any]:
-        """Which System 2 model is configured and whether System 1 is reachable.
-        System 1 being down is degraded, not broken: decisions fall back to the LLM."""
-        system1: dict[str, Any] = {"enabled": settings.system1_enabled}
-        if settings.system1_enabled:
-            try:
-                async with httpx.AsyncClient(timeout=1.0) as http:
-                    resp = await http.get(f"{settings.system1_url}/health")
-                system1["reachable"] = resp.status_code == 200
-            except httpx.HTTPError:
-                system1["reachable"] = False
-        return {
-            "llm": {
-                "model": settings.llm_model,
-                "endpoint": urlsplit(settings.llm_base_url).hostname,
-                "configured": bool(settings.llm_api_key.get_secret_value()),
-            },
-            "system1": system1,
+        """Is each AI dependency actually usable? Asks the providers, not just the config.
+
+        - LLM: lists the provider's models and checks the configured one is there
+          (providers retire models; a 404 on every turn is the symptom otherwise).
+        - System 1: its health endpoint. Down is degraded, not broken: decisions fall back
+          to the LLM. On first start Laya is unreachable while it downloads and loads
+          its weights.
+        """
+        key = settings.llm_api_key.get_secret_value()
+        llm: dict[str, Any] = {
+            "model": settings.llm_model,
+            "endpoint": urlsplit(settings.llm_base_url).hostname,
+            "configured": bool(key),
         }
+        async with httpx.AsyncClient(timeout=3.0) as http:
+            try:
+                resp = await http.get(
+                    f"{settings.llm_base_url.rstrip('/')}/models",
+                    headers={"Authorization": f"Bearer {key or 'none'}"},
+                )
+                if resp.status_code == 200:
+                    ids = sorted(m.get("id", "") for m in resp.json().get("data", []))
+                    llm["available"] = settings.llm_model in ids
+                    if not llm["available"]:
+                        llm["problem"] = "model not offered by this provider"
+                        llm["offered"] = ids[:20]
+                else:
+                    llm["available"] = False
+                    llm["problem"] = f"provider returned HTTP {resp.status_code}"
+            except httpx.HTTPError as exc:
+                llm["available"] = False
+                llm["problem"] = f"provider unreachable ({type(exc).__name__})"
+
+            system1: dict[str, Any] = {"enabled": settings.system1_enabled}
+            if settings.system1_enabled:
+                try:
+                    resp = await http.get(f"{settings.system1_url}/health", timeout=1.0)
+                    system1["reachable"] = resp.status_code == 200
+                except httpx.HTTPError:
+                    system1["reachable"] = False
+                    system1["problem"] = "not answering: still loading its models, or not running"
+        return {"llm": llm, "system1": system1}
 
     @router.post("/chat")
     async def chat(body: ChatRequest, service: Service) -> ChatResponse:

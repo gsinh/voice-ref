@@ -319,3 +319,14 @@ async def test_cascade_skips_llm_when_system1_is_confident() -> None:
     llm = LLMFixed("b", None)
     await CascadeDecision(Fixed("a", 0.99), llm).choose(Q, "text")
     assert llm.calls == 0
+
+
+async def test_cascade_notes_say_why_things_failed() -> None:
+    class NotFound:
+        async def choose(self, question: Question, text: str) -> Decision:
+            raise LookupError("The model x does not exist or you do not have access to it.")
+
+    decision = await CascadeDecision(Fixed("a", 0.9, fail=True), NotFound()).choose(Q, "t")
+    assert decision.source == "none"
+    assert "ConnectionError" in decision.notes[0]
+    assert "does not exist" in decision.notes[1]

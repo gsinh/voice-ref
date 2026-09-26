@@ -19,7 +19,7 @@ audited tool call.
 | Media / VAD | LiveKit Cloud, Silero |
 | STT / TTS | Groq Whisper / Kokoro |
 | System 1 (fast decisions) | Laya: intent, confirmation, risk, with calibrated confidence |
-| System 2 (language) | Llama on Groq, or Ollama offline |
+| System 2 (language) | gpt-oss-120b on Groq, or Llama on Ollama offline |
 | Orchestration | LangGraph, with Postgres checkpoints and `interrupt()` for confirmations |
 | Tools | MCP, the LLM's only path to bank data |
 | Backend | FastAPI **modular monolith**, with module boundaries enforced in CI |

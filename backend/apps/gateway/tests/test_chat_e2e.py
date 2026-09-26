@@ -78,6 +78,10 @@ def _choose(system: str, said: str) -> str:
 def fake_llm_router() -> APIRouter:
     router = APIRouter()
 
+    @router.get("/v1/models")
+    async def models() -> dict[str, Any]:
+        return {"object": "list", "data": [{"id": "fake-model", "object": "model"}]}
+
     @router.post("/v1/chat/completions")
     async def completions(body: dict[str, Any]) -> dict[str, Any]:
         messages = body["messages"]
@@ -118,6 +122,7 @@ def base_url() -> Iterator[str]:
         "ORCHESTRATOR_BANK_API_URL": f"{base}/bank",
         "LLM_BASE_URL": f"{base}/fake-llm/v1",
         "LLM_API_KEY": "test",
+        "LLM_MODEL": "fake-model",
         "SYSTEM1_ENABLED": "false",
     }.items():
         mp.setenv(k, v)
@@ -193,3 +198,9 @@ def test_state_survives_between_requests(base_url: str) -> None:
     assert chat.say("balance please")["awaiting"] == "otp"
     transcript = httpx.get(f"{base_url}/api/conversations/{chat.id}", timeout=10).json()
     assert transcript["messages"][0] == {"role": "customer", "text": "balance please"}
+
+
+def test_status_checks_the_model_with_the_provider(base_url: str) -> None:
+    status = httpx.get(f"{base_url}/api/status", timeout=10).json()
+    assert status["llm"]["available"] is True
+    assert status["system1"] == {"enabled": False}

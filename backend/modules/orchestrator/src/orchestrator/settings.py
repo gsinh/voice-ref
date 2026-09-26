@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     # (http://host.docker.internal:11434/v1).
     llm_base_url: str = Field("https://api.groq.com/openai/v1", validation_alias="LLM_BASE_URL")
     llm_api_key: SecretStr = Field(SecretStr(""), validation_alias="LLM_API_KEY")
-    llm_model: str = Field("llama-3.3-70b-versatile", validation_alias="LLM_MODEL")
+    llm_model: str = Field("openai/gpt-oss-120b", validation_alias="LLM_MODEL")
     llm_timeout_s: float = Field(20.0, validation_alias="LLM_TIMEOUT_S")
 
     # System 1: anything speaking POST /v1/systemone (Laya sidecar, or hosted Jev).

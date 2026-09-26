@@ -18,7 +18,7 @@ x-backend: &backend
     TOKEN_SIGNING_KEY: ${TOKEN_SIGNING_KEY:?set TOKEN_SIGNING_KEY in .env}
     LLM_BASE_URL: ${LLM_BASE_URL:-https://api.groq.com/openai/v1}
     LLM_API_KEY: ${LLM_API_KEY:-}
-    LLM_MODEL: ${LLM_MODEL:-llama-3.3-70b-versatile}
+    LLM_MODEL: ${LLM_MODEL:-openai/gpt-oss-120b}
     SIDECARS: ${SIDECARS-laya}   # no colon: an explicitly empty value means "none"
     SYSTEM1_ENABLED: ${SYSTEM1_ENABLED:-true}
     SYSTEM1_URL: ${SYSTEM1_URL:-http://127.0.0.1:8100}

@@ -124,7 +124,7 @@ The voice turn does the minimum synchronously. Everything durable and slow runs 
 | VAD | Silero | — |
 | STT | Groq Whisper | faster-whisper container |
 | System 1 | Laya's server (`laya-serve`) as a localhost sidecar; natively on the Mac GPU in dev | Hosted Jev (same API), or `LLMDecision` |
-| System 2 | Llama on Groq | Llama on Ollama (native on the Mac: `llama3.2:3b`) |
+| System 2 | `openai/gpt-oss-120b` on Groq (Groq retired its Llama 3.3 model; ADR-0008) | Llama on Ollama (native on the Mac: `llama3.2:3b`) |
 | Orchestration | LangGraph + Postgres checkpointer | — |
 | Tools | MCP (FastMCP, streamable HTTP) + `langchain-mcp-adapters` | — |
 | AI gateway | agentgateway sidecar: LLM failover, per-tool authz, rate limits, OTel (Phase 3) | Direct URLs (Phase 1–2) |

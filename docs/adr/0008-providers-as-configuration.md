@@ -8,8 +8,8 @@ We want one model family (Llama) that runs both fast (hosted) and offline (local
 vendor lock-in, and free tiers where possible.
 
 ## Decision
-- LLM: Llama via **Groq** by default, via **Ollama** when offline. Selected by
-  `LLM_PROVIDER` and `LLM_MODEL`, built with LangChain's `init_chat_model`.
+- LLM: any **OpenAI-compatible endpoint**, chosen by `LLM_BASE_URL` and `LLM_MODEL`:
+  **Groq** by default (`openai/gpt-oss-120b`), **Ollama** when offline (`llama3.2:3b`).
 - STT: Groq Whisper by default, faster-whisper offline.
 - TTS: Kokoro by default, Piper as an alternative.
 - Media: LiveKit Cloud by default, self-hosted LiveKit as an option.
@@ -27,3 +27,15 @@ Free-tier rate limits apply, so the eval runner paces itself.
 ## Principle
 **Dependency inversion** by configuration, and **KISS**: don't wrap an abstraction
 you already have.
+
+## Revision (Phase 1): the provider retired our model
+Groq decommissioned `llama-3.3-70b-versatile` on 2026-08-16 and deprecated its other
+Llama models, so every turn failed with "model does not exist". Because the model is
+configuration, the fix was one env value (default now `openai/gpt-oss-120b`, Groq's
+recommended replacement). Two lessons now in the code:
+- `/api/status` asks the provider for its model list and says when the configured model
+  isn't offered (and what is), instead of letting every turn fail.
+- Decision traces carry the error message, not only its type.
+
+A third-party model is a dependency with a lifecycle, like a library version. Pin it,
+watch the provider's deprecation notices, and make a swap a config change.
