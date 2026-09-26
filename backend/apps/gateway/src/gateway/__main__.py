@@ -1,6 +1,7 @@
 """Entry point. Admin tasks are one-off processes of the same image (12-factor, XII):
 
-python -m gateway serve     # default: run the HTTP server
+python -m gateway start     # default: gateway + sidecars under the launcher
+python -m gateway serve     # the HTTP server alone
 python -m gateway migrate   # apply each module's pending migrations
 python -m gateway seed      # reset the synthetic demo data
 python -m gateway migrate seed   # several commands, in order
@@ -14,6 +15,7 @@ import uvicorn
 
 import banking_api
 import orchestrator
+from gateway import launcher
 from gateway.composition import ModuleSettings, migration_sets
 from gateway.logging import configure_logging
 from gateway.migrate import apply, run_script
@@ -21,13 +23,13 @@ from gateway.settings import Settings
 
 log = logging.getLogger("gateway")
 
-COMMANDS = ["serve", "migrate", "seed"]
+COMMANDS = ["start", "serve", "migrate", "seed"]
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(prog="gateway")
     parser.add_argument("commands", nargs="*", metavar="command", help=f"one of {COMMANDS}")
-    commands: list[str] = parser.parse_args().commands or ["serve"]
+    commands: list[str] = parser.parse_args().commands or ["start"]
     if unknown := [c for c in commands if c not in COMMANDS]:
         parser.error(f"unknown command(s) {unknown}; choose from {COMMANDS}")
 
@@ -40,7 +42,9 @@ def main() -> None:
 
 
 def run_command(command: str, settings: Settings, modules: ModuleSettings) -> None:
-    if command == "serve":
+    if command == "start":
+        launcher.main()
+    elif command == "serve":
         # Port binding (factor VII). Uvicorn drains in-flight requests on SIGTERM (factor IX).
         uvicorn.run(
             "gateway.app:create_app",

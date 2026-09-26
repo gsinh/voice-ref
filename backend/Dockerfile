@@ -2,8 +2,12 @@
 # `backend/` directory, which is also exactly what gets pushed to the Hugging Face Space.
 #
 # Same image, different commands (12-factor, XII):
-#   docker run IMAGE                 -> serve (default)
+#   docker run IMAGE                 -> start: gateway + sidecars (SIDECARS=laya)
 #   docker run IMAGE migrate seed    -> one-off admin tasks
+#
+# Build args:
+#   WITH_LAYA=false  skip the Laya sidecar (~1 GB of CPU PyTorch). Useful on a Mac, where
+#                    Laya runs faster natively on the Apple GPU (see README).
 
 # uv comes from its official image. Overridable, e.g. to use a registry mirror.
 ARG UV_IMAGE=ghcr.io/astral-sh/uv:0.8
@@ -28,13 +32,28 @@ COPY modules modules
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --no-dev --no-editable --package gateway
 
+# Laya (System 1) in its own virtualenv: PyTorch never enters the app's dependency tree,
+# and the app talks to it only over HTTP on localhost (ADR-0005).
+FROM python:3.12-slim AS laya
+ARG WITH_LAYA=true
+ARG LAYA_VERSION=0.3.20
+RUN python -m venv /opt/laya && if [ "$WITH_LAYA" = "true" ]; then \
+      /opt/laya/bin/pip install --no-cache-dir \
+        --index-url https://download.pytorch.org/whl/cpu torch && \
+      /opt/laya/bin/pip install --no-cache-dir "laya[serve]==${LAYA_VERSION}"; \
+    fi
+
 FROM python:3.12-slim AS runtime
 # Hugging Face Spaces run containers as uid 1000.
 RUN useradd --create-home --uid 1000 user
 COPY --from=build --chown=user:user /app/.venv /app/.venv
-ENV PATH="/app/.venv/bin:$PATH" PYTHONUNBUFFERED=1 PORT=7860
+COPY --from=laya --chown=user:user /opt/laya /opt/laya
+# Model weights download here on first start; mount a volume to keep them between runs.
+RUN mkdir -p /data/hf && chown user:user /data/hf
+ENV PATH="/app/.venv/bin:$PATH" PYTHONUNBUFFERED=1 PORT=7860 HF_HOME=/data/hf
 USER user
 EXPOSE 7860
-# Exec form: Python is PID 1 and receives SIGTERM directly for a graceful shutdown.
+# Exec form: the launcher is PID 1, receives SIGTERM directly and forwards it to every
+# process it started (gateway, sidecars) for a graceful shutdown.
 ENTRYPOINT ["python", "-m", "gateway"]
-CMD ["serve"]
+CMD ["start"]

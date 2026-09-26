@@ -5,7 +5,9 @@ import uuid
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Annotated, Any
+from urllib.parse import urlsplit
 
+import httpx
 from fastapi import APIRouter, Depends, FastAPI, Request
 from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
@@ -114,6 +116,27 @@ def create_router(settings: Settings) -> APIRouter:
     @router.get("/")
     async def info() -> dict[str, str]:
         return {"module": "orchestrator", "status": "ok"}
+
+    @router.get("/status")
+    async def status() -> dict[str, Any]:
+        """Which System 2 model is configured and whether System 1 is reachable.
+        System 1 being down is degraded, not broken: decisions fall back to the LLM."""
+        system1: dict[str, Any] = {"enabled": settings.system1_enabled}
+        if settings.system1_enabled:
+            try:
+                async with httpx.AsyncClient(timeout=1.0) as http:
+                    resp = await http.get(f"{settings.system1_url}/health")
+                system1["reachable"] = resp.status_code == 200
+            except httpx.HTTPError:
+                system1["reachable"] = False
+        return {
+            "llm": {
+                "model": settings.llm_model,
+                "endpoint": urlsplit(settings.llm_base_url).hostname,
+                "configured": bool(settings.llm_api_key.get_secret_value()),
+            },
+            "system1": system1,
+        }
 
     @router.post("/chat")
     async def chat(body: ChatRequest, service: Service) -> ChatResponse:
