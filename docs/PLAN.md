@@ -73,7 +73,7 @@ A large Indian retail bank handles millions of calls a month through a menu-driv
 
 ### System 1 / System 2
 
-| | System 1 — **Laya** | System 2 — **Llama** |
+| | System 1 — **Laya** | System 2 — **LLM** (gpt-oss on Groq, Llama on Ollama) |
 |---|---|---|
 | Job | Bounded decisions: pick a label, a score, yes/no | Language: reasoning, tool use, natural replies |
 | Latency | Tens of ms (to be measured) | Hundreds of ms |
