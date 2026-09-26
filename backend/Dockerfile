@@ -2,7 +2,7 @@
 # `backend/` directory, which is also exactly what gets pushed to the Hugging Face Space.
 #
 # Same image, different commands (12-factor, XII):
-#   docker run IMAGE                 -> start: gateway + sidecars (SIDECARS=laya)
+#   docker run IMAGE                 -> start: gateway + sidecars (SIDECARS=laya,voice)
 #   docker run IMAGE migrate seed    -> one-off admin tasks
 #
 # Build args:
@@ -20,17 +20,18 @@ WORKDIR /app
 # Dependencies first, so editing code doesn't invalidate the dependency layer.
 COPY pyproject.toml uv.lock ./
 COPY apps/gateway/pyproject.toml apps/gateway/pyproject.toml
+COPY apps/voice_worker/pyproject.toml apps/voice_worker/pyproject.toml
 COPY libs/signed_tokens/pyproject.toml libs/signed_tokens/pyproject.toml
 COPY modules/banking_api/pyproject.toml modules/banking_api/pyproject.toml
 COPY modules/mcp_server/pyproject.toml modules/mcp_server/pyproject.toml
 COPY modules/orchestrator/pyproject.toml modules/orchestrator/pyproject.toml
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --locked --no-dev --no-install-workspace --package gateway
+    uv sync --locked --no-dev --no-install-workspace --all-packages
 COPY apps apps
 COPY libs libs
 COPY modules modules
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --locked --no-dev --no-editable --package gateway
+    uv sync --locked --no-dev --no-editable --all-packages
 
 # Laya (System 1) in its own virtualenv: PyTorch never enters the app's dependency tree,
 # and the app talks to it only over HTTP on localhost (ADR-0005).
@@ -48,9 +49,11 @@ FROM python:3.12-slim AS runtime
 RUN useradd --create-home --uid 1000 user
 COPY --from=build --chown=user:user /app/.venv /app/.venv
 COPY --from=laya --chown=user:user /opt/laya /opt/laya
-# Model weights download here on first start; mount a volume to keep them between runs.
-RUN mkdir -p /data/hf && chown user:user /data/hf
-ENV PATH="/app/.venv/bin:$PATH" PYTHONUNBUFFERED=1 PORT=7860 HF_HOME=/data/hf
+# Model files (Laya weights, Kokoro voice) download here on first start; mount a volume
+# to keep them between runs.
+RUN mkdir -p /data/hf /data/models && chown -R user:user /data
+ENV PATH="/app/.venv/bin:$PATH" PYTHONUNBUFFERED=1 PORT=7860 HF_HOME=/data/hf \
+    KOKORO_DIR=/data/models/kokoro
 USER user
 EXPOSE 7860
 # Exec form: the launcher is PID 1, receives SIGTERM directly and forwards it to every

@@ -44,6 +44,9 @@ def sidecars(names: list[str]) -> list[Process]:
                 "LAYA_THREADS": os.environ.get("LAYA_THREADS", "2"),
             },
         ),
+        # The LiveKit voice worker: connects out to LiveKit and sends each caller turn to
+        # this container's /api/chat. Same interpreter and virtualenv as the gateway.
+        "voice": Process("voice", [sys.executable, "-m", "voice_worker"], {}),
     }
     unknown = [n for n in names if n not in known]
     if unknown:

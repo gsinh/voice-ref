@@ -24,6 +24,19 @@ x-backend: &backend
     SYSTEM1_URL: ${SYSTEM1_URL:-http://127.0.0.1:8100}
     SYSTEM1_API_KEY: ${SYSTEM1_API_KEY:-}
     DEMO_OTP: ${DEMO_OTP:-123456}
+    # Voice (Phase 2): add "voice" to SIDECARS once LiveKit is configured.
+    LIVEKIT_URL: ${LIVEKIT_URL:-}
+    LIVEKIT_API_KEY: ${LIVEKIT_API_KEY:-}
+    LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET:-}
+    LIVEKIT_AGENT_NAME: ${LIVEKIT_AGENT_NAME:-bank-agent}
+    STT_BASE_URL: ${STT_BASE_URL:-https://api.groq.com/openai/v1}
+    STT_MODEL: ${STT_MODEL:-whisper-large-v3-turbo}
+    STT_API_KEY: ${STT_API_KEY:-}
+    TTS_PROVIDER: ${TTS_PROVIDER:-kokoro}
+    TTS_VOICE: ${TTS_VOICE:-af_heart}
+    TTS_BASE_URL: ${TTS_BASE_URL:-}
+    TTS_MODEL: ${TTS_MODEL:-}
+    TTS_API_KEY: ${TTS_API_KEY:-}
 
 services:
   postgres:
@@ -61,7 +74,8 @@ services:
     stop_grace_period: 15s
     ports: ["127.0.0.1:${BACKEND_HOST_PORT:-7860}:7860"]
     volumes:
-      - hfcache:/data/hf   # Laya weights survive restarts
+      - hfcache:/data/hf         # Laya weights survive restarts
+      - models:/data/models      # Kokoro voice model survives restarts
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:7860/healthz', timeout=2)"]
       interval: 10s
@@ -77,6 +91,11 @@ services:
     restart: unless-stopped
     environment:
       BACKEND_URL: http://backend:7860
+      # The BFF mints LiveKit tokens for the /call page (secret stays server-side).
+      LIVEKIT_URL: ${LIVEKIT_URL:-}
+      LIVEKIT_API_KEY: ${LIVEKIT_API_KEY:-}
+      LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET:-}
+      LIVEKIT_AGENT_NAME: ${LIVEKIT_AGENT_NAME:-bank-agent}
       # BACKEND_TOKEN is only needed for the private HF Space in production.
     ports: ["127.0.0.1:${WEB_HOST_PORT:-3000}:3000"]
     healthcheck:
@@ -90,3 +109,4 @@ services:
 volumes:
   pgdata:
   hfcache:
+  models:
