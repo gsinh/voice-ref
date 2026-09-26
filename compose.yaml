@@ -1,0 +1,114 @@
+# Core services start with a plain `docker compose up`. Optional services join later
+# phases behind profiles (voice, workflows, local-ai) — added only when needed (YAGNI).
+#
+# Every setting comes from .env (12-factor). Host ports bind to 127.0.0.1 only: in
+# production Cloudflare Tunnel connects locally, so nothing is exposed publicly.
+
+x-python-service: &python-service
+  restart: unless-stopped
+  stop_grace_period: 15s
+  environment: &python-env
+    ENVIRONMENT: ${ENVIRONMENT:-local}
+    LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    PORT: "8000"
+  healthcheck:
+    test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/healthz', timeout=2)"]
+    interval: 10s
+    timeout: 3s
+    retries: 5
+    start_period: 10s
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: voiceref
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      BANK_DB_PASSWORD: ${BANK_DB_PASSWORD:?set BANK_DB_PASSWORD in .env}
+      ORCHESTRATOR_DB_PASSWORD: ${ORCHESTRATOR_DB_PASSWORD:?set ORCHESTRATOR_DB_PASSWORD in .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./infra/postgres/init:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "127.0.0.1:${POSTGRES_HOST_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d voiceref"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  banking_api:
+    <<: *python-service
+    image: ${IMAGE_PREFIX:-voiceref}/banking_api:${IMAGE_TAG:-dev}
+    build:
+      context: .
+      dockerfile: services/python.Dockerfile
+      args: { SERVICE: banking_api, PACKAGE: banking-api }
+    environment:
+      <<: *python-env
+      SERVICE_NAME: banking_api
+      DATABASE_URL: postgresql://bank_api:${BANK_DB_PASSWORD}@postgres:5432/voiceref
+    ports: ["127.0.0.1:8001:8000"]
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  mcp_server:
+    <<: *python-service
+    image: ${IMAGE_PREFIX:-voiceref}/mcp_server:${IMAGE_TAG:-dev}
+    build:
+      context: .
+      dockerfile: services/python.Dockerfile
+      args: { SERVICE: mcp_server, PACKAGE: mcp-server }
+    environment:
+      <<: *python-env
+      SERVICE_NAME: mcp_server
+      BANKING_API_URL: http://banking_api:8000
+    ports: ["127.0.0.1:8002:8000"]
+
+  decision:
+    <<: *python-service
+    image: ${IMAGE_PREFIX:-voiceref}/decision:${IMAGE_TAG:-dev}
+    build:
+      context: .
+      dockerfile: services/python.Dockerfile
+      args: { SERVICE: decision, PACKAGE: decision }
+    environment:
+      <<: *python-env
+      SERVICE_NAME: decision
+    ports: ["127.0.0.1:8003:8000"]
+
+  orchestrator:
+    <<: *python-service
+    image: ${IMAGE_PREFIX:-voiceref}/orchestrator:${IMAGE_TAG:-dev}
+    build:
+      context: .
+      dockerfile: services/python.Dockerfile
+      args: { SERVICE: orchestrator, PACKAGE: orchestrator }
+    environment:
+      <<: *python-env
+      SERVICE_NAME: orchestrator
+      DATABASE_URL: postgresql://orchestrator:${ORCHESTRATOR_DB_PASSWORD}@postgres:5432/voiceref
+    ports: ["127.0.0.1:8000:8000"]
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  web:
+    image: ${IMAGE_PREFIX:-voiceref}/web:${IMAGE_TAG:-dev}
+    build: { context: services/web }
+    restart: unless-stopped
+    environment:
+      ORCHESTRATOR_URL: http://orchestrator:8000
+      BANKING_API_URL: http://banking_api:8000
+      MCP_SERVER_URL: http://mcp_server:8000
+      DECISION_URL: http://decision:8000
+    ports: ["127.0.0.1:${WEB_HOST_PORT:-3000}:3000"]
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/api/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  pgdata:
