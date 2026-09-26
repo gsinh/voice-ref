@@ -18,7 +18,6 @@ Rules this graph enforces in code, not in prompts:
   the top on resume, so nodes that interrupt have no side effects before the interrupt.
 """
 
-import re
 from dataclasses import dataclass
 from typing import Annotated, Any, Literal, TypedDict
 
@@ -39,6 +38,7 @@ from langgraph.types import interrupt
 
 from orchestrator import prompts, questions
 from orchestrator.ports import CustomerDirectory, DecisionPort, ToolsProvider
+from orchestrator.spoken import spoken_digits
 from orchestrator.telemetry import TurnRecorder
 from signed_tokens import issue_confirmation
 
@@ -103,11 +103,6 @@ def _last_human(state: State) -> str:
     return ""
 
 
-def _digits(text: str) -> str:
-    """'1 2 3 4 5 6', '123-456' and 'one two...' transcribed as digits all normalise."""
-    return re.sub(r"\D", "", text)
-
-
 # ---- nodes ---------------------------------------------------------------------------
 
 
@@ -142,7 +137,7 @@ async def authenticate(state: State, runtime: Rt) -> dict[str, Any]:
     for _ in range(deps.max_otp_attempts):
         answer = str(interrupt({"kind": "otp", "prompt": prompt}))
         transcript += [AIMessage(prompt), HumanMessage("[one-time code withheld]")]
-        if _digits(answer) == deps.demo_otp:
+        if spoken_digits(answer) == deps.demo_otp:
             return {
                 "messages": transcript,
                 "customer_id": customer.id,
