@@ -43,7 +43,10 @@ def base_url() -> Iterator[str]:
     server = uvicorn.Server(uvicorn.Config(create_app(), port=port, log_config=None))
     thread = threading.Thread(target=server.run, daemon=True)
     thread.start()
+    deadline = time.monotonic() + 15
     while not server.started:
+        if not thread.is_alive() or time.monotonic() > deadline:
+            pytest.fail("test server failed to start (see logs)")
         time.sleep(0.05)
     yield f"http://127.0.0.1:{port}"
     server.should_exit = True

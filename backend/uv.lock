@@ -833,7 +833,7 @@ dependencies = [
     { name = "langgraph-checkpoint-postgres" },
     { name = "psycopg", extra = ["binary", "pool"] },
     { name = "pydantic-settings" },
-    { name = "pyjwt" },
+    { name = "signed-tokens" },
 ]
 
 [package.metadata]
@@ -846,7 +846,7 @@ requires-dist = [
     { name = "langgraph-checkpoint-postgres", specifier = ">=3.1" },
     { name = "psycopg", extras = ["binary", "pool"], specifier = ">=3.2" },
     { name = "pydantic-settings", specifier = ">=2.10" },
-    { name = "pyjwt", specifier = ">=2.10" },
+    { name = "signed-tokens", editable = "libs/signed_tokens" },
 ]
 
 [[package]]

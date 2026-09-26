@@ -3,14 +3,17 @@
 python -m gateway serve     # default: run the HTTP server
 python -m gateway migrate   # apply each module's pending migrations
 python -m gateway seed      # reset the synthetic demo data
+python -m gateway migrate seed   # several commands, in order
 """
 
 import argparse
+import asyncio
 import logging
 
 import uvicorn
 
 import banking_api
+import orchestrator
 from gateway.composition import ModuleSettings, migration_sets
 from gateway.logging import configure_logging
 from gateway.migrate import apply, run_script
@@ -51,6 +54,9 @@ def run_command(command: str, settings: Settings, modules: ModuleSettings) -> No
         for ms in migration_sets(modules):
             applied = apply(ms)
             log.info("migrations up to date", extra={"component": ms.module, "applied": applied})
+        # LangGraph owns its checkpoint tables; its setup() is idempotent.
+        asyncio.run(orchestrator.setup_storage(modules.orchestrator.database_url))
+        log.info("checkpoint storage ready", extra={"component": "orchestrator"})
     elif command == "seed":
         run_script(modules.bank.database_url, banking_api.SCHEMA, banking_api.SEED)
         log.info("demo data reset", extra={"component": "banking_api"})

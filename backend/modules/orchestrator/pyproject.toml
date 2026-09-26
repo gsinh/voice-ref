@@ -12,8 +12,11 @@ dependencies = [
     "langchain-openai>=1.6",
     "langchain-mcp-adapters>=0.3",
     "httpx>=0.28",
-    "pyjwt>=2.10",
+    "signed-tokens",
 ]
+
+[tool.uv.sources]
+signed-tokens = { workspace = true }
 
 [build-system]
 requires = ["hatchling"]

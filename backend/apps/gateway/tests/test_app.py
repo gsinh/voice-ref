@@ -43,4 +43,4 @@ def test_all_modules_are_mounted() -> None:
         "banking_api": "/bank",
         "mcp_server": "/mcp",
     }
-    assert client.get("/api/").json()["status"] == "skeleton"
+    assert client.get("/api/").json()["status"] == "ok"
