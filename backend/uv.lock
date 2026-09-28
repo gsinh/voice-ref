@@ -5,6 +5,7 @@ requires-python = "==3.12.*"
 [manifest]
 members = [
     "banking-api",
+    "config-kit",
     "gateway",
     "mcp-server",
     "orchestrator",
@@ -186,6 +187,7 @@ name = "banking-api"
 version = "0.1.0"
 source = { editable = "modules/banking_api" }
 dependencies = [
+    { name = "config-kit" },
     { name = "fastapi" },
     { name = "psycopg", extra = ["binary", "pool"] },
     { name = "pydantic-settings" },
@@ -193,6 +195,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "config-kit", editable = "libs/config_kit" },
     { name = "fastapi", specifier = ">=0.116" },
     { name = "psycopg", extras = ["binary", "pool"], specifier = ">=3.2" },
     { name = "pydantic-settings", specifier = ">=2.10" },
@@ -297,6 +300,17 @@ sdist = { url = "https://files.pythonhosted.org/packages/d8/53/6f443c9a4a8358a93
 wheels = [
     { url = "https://files.pythonhosted.org/packages/d1/d6/3965ed04c63042e047cb6a3e6ed1a63a35087b6a609aa3a15ed8ac56c221/colorama-0.4.6-py2.py3-none-any.whl", hash = "sha256:4f1d9991f5acc0ca119f9d443620b77f9d6b33703e51011c16baf57afb285fc6", size = 25335, upload-time = "2022-10-25T02:36:20.889Z" },
 ]
+
+[[package]]
+name = "config-kit"
+version = "0.1.0"
+source = { editable = "libs/config_kit" }
+dependencies = [
+    { name = "pydantic-settings" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "pydantic-settings", specifier = ">=2.10" }]
 
 [[package]]
 name = "cryptography"
@@ -439,6 +453,7 @@ version = "0.1.0"
 source = { editable = "apps/gateway" }
 dependencies = [
     { name = "banking-api" },
+    { name = "config-kit" },
     { name = "fastapi" },
     { name = "mcp-server" },
     { name = "orchestrator" },
@@ -450,6 +465,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "banking-api", editable = "modules/banking_api" },
+    { name = "config-kit", editable = "libs/config_kit" },
     { name = "fastapi", specifier = ">=0.116" },
     { name = "mcp-server", editable = "modules/mcp_server" },
     { name = "orchestrator", editable = "modules/orchestrator" },
@@ -1132,6 +1148,7 @@ name = "mcp-server"
 version = "0.1.0"
 source = { editable = "modules/mcp_server" }
 dependencies = [
+    { name = "config-kit" },
     { name = "fastapi" },
     { name = "httpx" },
     { name = "mcp" },
@@ -1141,6 +1158,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "config-kit", editable = "libs/config_kit" },
     { name = "fastapi", specifier = ">=0.116" },
     { name = "httpx", specifier = ">=0.28" },
     { name = "mcp", specifier = ">=1.24,<2" },
@@ -1399,6 +1417,7 @@ name = "orchestrator"
 version = "0.1.0"
 source = { editable = "modules/orchestrator" }
 dependencies = [
+    { name = "config-kit" },
     { name = "fastapi" },
     { name = "httpx" },
     { name = "langchain-mcp-adapters" },
@@ -1412,6 +1431,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "config-kit", editable = "libs/config_kit" },
     { name = "fastapi", specifier = ">=0.116" },
     { name = "httpx", specifier = ">=0.28" },
     { name = "langchain-mcp-adapters", specifier = ">=0.3" },
@@ -2201,6 +2221,7 @@ name = "voice-worker"
 version = "0.1.0"
 source = { editable = "apps/voice_worker" }
 dependencies = [
+    { name = "config-kit" },
     { name = "httpx" },
     { name = "kokoro-onnx" },
     { name = "livekit-agents" },
@@ -2211,6 +2232,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "config-kit", editable = "libs/config_kit" },
     { name = "httpx", specifier = ">=0.28" },
     { name = "kokoro-onnx", specifier = ">=0.6" },
     { name = "livekit-agents", specifier = ">=1.8,<2" },

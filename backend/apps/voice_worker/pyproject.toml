@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "LiveKit voice agent: audio in and out, with the orchestrator's graph doing the thinking."
 requires-python = ">=3.12,<3.13"
 dependencies = [
+    "config-kit",
     "livekit-agents>=1.8,<2",
     "livekit-plugins-silero>=1.8,<2",
     "livekit-plugins-openai>=1.8,<2",
@@ -11,6 +12,9 @@ dependencies = [
     "httpx>=0.28",
     "pydantic-settings>=2.10",
 ]
+
+[tool.uv.sources]
+config-kit = { workspace = true }
 
 [build-system]
 requires = ["hatchling"]

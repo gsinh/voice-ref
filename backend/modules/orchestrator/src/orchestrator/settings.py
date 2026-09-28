@@ -1,14 +1,14 @@
 from pydantic import Field, SecretStr
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings
+
+from config_kit import settings_config
 
 
 class Settings(BaseSettings):
     """Orchestrator settings. Module-owned values use the `ORCHESTRATOR_` prefix; values
     shared with other components (LLM, System-1, signing key) use their plain names."""
 
-    model_config = SettingsConfigDict(
-        env_prefix="ORCHESTRATOR_", extra="ignore", frozen=True, populate_by_name=True
-    )
+    model_config = settings_config(env_prefix="ORCHESTRATOR_", populate_by_name=True)
 
     database_url: str = "postgresql://orchestrator:orchestrator@localhost:5432/voiceref"
     # Other modules, reached over loopback HTTP (ADR-0015). Phase 3 points mcp_url at

@@ -158,7 +158,8 @@ The voice turn does the minimum synchronously. Everything durable and slow runs 
 ```
 voice-ref/
 ├── compose.yaml               # local stack: postgres, migrate, backend, web
-├── .env.example               # every setting, documented
+├── .env.example               # every setting, documented (no secrets)
+├── scripts/make-secrets.sh    # ./secrets: generated passwords and keys (ADR-0019)
 ├── Makefile                   # the commands a contributor runs (CI runs the same)
 ├── backend/                   # uv workspace; this folder is what the HF Space builds
 │   ├── Dockerfile             # one image: start | serve | migrate | seed (+ Laya venv)
@@ -170,7 +171,6 @@ voice-ref/
 │       └── mcp_server/        # MCP tools                → /mcp
 ├── web/                       # Next.js SSR BFF
 ├── infra/
-│   ├── postgres/              # one-time role/schema bootstrap (local + Neon)
 │   └── kestra/                # Kestra Space + flows     (Phase 3)
 ├── evals/                     #                          (Phase 4)
 ├── docs/

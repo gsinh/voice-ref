@@ -32,9 +32,9 @@ audited tool call.
 Requires Docker (OrbStack or Docker Desktop), [uv](https://docs.astral.sh/uv/) and Node 22.
 
 ```bash
-make setup   # install dependencies, create .env
-# edit .env: set LLM_API_KEY (Groq) and a random TOKEN_SIGNING_KEY
-make up      # postgres → migrate + seed → backend (+ Laya sidecar) → web
+make setup   # install dependencies, create .env and ./secrets (random passwords, keys)
+# put your Groq key in secrets/LLM_API_KEY
+make up      # postgres → bootstrap + migrate + seed → backend (+ Laya sidecar) → web
 open http://localhost:3000/chat
 ```
 
@@ -53,6 +53,10 @@ Try, as Aarav Sharma (one-time code `123456`):
 - "What's my balance?"
 - "What is this ₹1,999 charge from yesterday?"
 - "I've lost my debit card" → confirm → the card is blocked, once
+
+Secrets live in `./secrets` (gitignored, private), never in `.env` or environment
+variables; see ADR-0019. Upgrading from an earlier checkout? Run `make secrets` (it moves
+keys over from `.env`), delete the secret lines from `.env`, and `make db-reset` once.
 
 `make seed` resets the demo data. `make help` lists everything; `make check` runs what CI
 runs.

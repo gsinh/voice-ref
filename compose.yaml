@@ -2,7 +2,10 @@
 # production) and the Next.js BFF (Cloudflare Workers in production). Optional services
 # join later behind profiles (workflows, voice), only when a phase needs them (YAGNI).
 #
-# Every setting comes from .env (12-factor). Host ports bind to 127.0.0.1 only.
+# Configuration comes from .env (12-factor); **secrets** come from files in ./secrets,
+# created by `make secrets` and mounted as Docker secrets at /run/secrets/<NAME>
+# (ADR-0019). Each service gets only the secrets it needs, and none of them appear in
+# environment variables or `docker inspect`. Host ports bind to 127.0.0.1 only.
 
 x-backend: &backend
   image: ${IMAGE_PREFIX:-voiceref}/backend:${IMAGE_TAG:-dev}
@@ -13,29 +16,25 @@ x-backend: &backend
   environment:
     ENVIRONMENT: ${ENVIRONMENT:-local}
     LOG_LEVEL: ${LOG_LEVEL:-INFO}
-    BANK_DATABASE_URL: postgresql://bank_api:${BANK_DB_PASSWORD}@postgres:5432/voiceref
-    ORCHESTRATOR_DATABASE_URL: postgresql://orchestrator:${ORCHESTRATOR_DB_PASSWORD}@postgres:5432/voiceref
-    TOKEN_SIGNING_KEY: ${TOKEN_SIGNING_KEY:?set TOKEN_SIGNING_KEY in .env}
     LLM_BASE_URL: ${LLM_BASE_URL:-https://api.groq.com/openai/v1}
-    LLM_API_KEY: ${LLM_API_KEY:-}
     LLM_MODEL: ${LLM_MODEL:-openai/gpt-oss-120b}
     SIDECARS: ${SIDECARS-laya}   # no colon: an explicitly empty value means "none"
     SYSTEM1_ENABLED: ${SYSTEM1_ENABLED:-true}
     SYSTEM1_URL: ${SYSTEM1_URL:-http://127.0.0.1:8100}
-    SYSTEM1_API_KEY: ${SYSTEM1_API_KEY:-}
     DEMO_OTP: ${DEMO_OTP:-123456}
     # Voice (Phase 2): add "voice" to SIDECARS once LiveKit is configured.
     LIVEKIT_URL: ${LIVEKIT_URL:-}
-    LIVEKIT_API_KEY: ${LIVEKIT_API_KEY:-}
-    LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET:-}
     LIVEKIT_AGENT_NAME: ${LIVEKIT_AGENT_NAME:-bank-agent}
     STT_BASE_URL: ${STT_BASE_URL:-https://api.groq.com/openai/v1}
     STT_MODEL: ${STT_MODEL:-whisper-large-v3-turbo}
-    STT_API_KEY: ${STT_API_KEY:-}
     TTS_PROVIDER: ${TTS_PROVIDER:-kokoro}
     TTS_VOICE: ${TTS_VOICE:-af_heart}
     TTS_BASE_URL: ${TTS_BASE_URL:-}
     TTS_MODEL: ${TTS_MODEL:-}
+    # Optional extra keys (Jev, a separate STT or TTS provider) can be added as more
+    # files in ./secrets with these names, or passed here as environment variables.
+    SYSTEM1_API_KEY: ${SYSTEM1_API_KEY:-}
+    STT_API_KEY: ${STT_API_KEY:-}
     TTS_API_KEY: ${TTS_API_KEY:-}
 
 services:
@@ -45,13 +44,12 @@ services:
     environment:
       POSTGRES_DB: voiceref
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
-      BANK_DB_PASSWORD: ${BANK_DB_PASSWORD:?set BANK_DB_PASSWORD in .env}
-      ORCHESTRATOR_DB_PASSWORD: ${ORCHESTRATOR_DB_PASSWORD:?set ORCHESTRATOR_DB_PASSWORD in .env}
+      # The admin password only. Module logins are created by `bootstrap`, which sends
+      # Postgres a SCRAM verifier, never a password.
+      POSTGRES_PASSWORD_FILE: /run/secrets/POSTGRES_PASSWORD
+    secrets: [POSTGRES_PASSWORD]
     volumes:
       - pgdata:/var/lib/postgresql/data
-      - ./infra/postgres/init:/docker-entrypoint-initdb.d:ro
-      - ./infra/postgres/bootstrap.sql:/bootstrap/bootstrap.sql:ro
     ports:
       - "127.0.0.1:${POSTGRES_HOST_PORT:-5432}:5432"
     healthcheck:
@@ -60,11 +58,13 @@ services:
       timeout: 3s
       retries: 10
 
-  # One-off admin process (12-factor, XII): migrate, then reset the demo data.
+  # One-off admin process (12-factor, XII): logins and schemas, migrations, demo data.
+  # The only service that ever sees the database admin login.
   migrate:
     <<: *backend
-    command: ["migrate", "seed"]
+    command: ["bootstrap", "migrate", "seed"]
     restart: "no"
+    secrets: [ADMIN_DATABASE_URL, BANK_DATABASE_URL, ORCHESTRATOR_DATABASE_URL, TOKEN_SIGNING_KEY]
     depends_on:
       postgres: { condition: service_healthy }
 
@@ -72,6 +72,13 @@ services:
     <<: *backend
     restart: unless-stopped
     stop_grace_period: 15s
+    secrets:
+      - BANK_DATABASE_URL
+      - ORCHESTRATOR_DATABASE_URL
+      - TOKEN_SIGNING_KEY
+      - LLM_API_KEY
+      - LIVEKIT_API_KEY
+      - LIVEKIT_API_SECRET
     ports: ["127.0.0.1:${BACKEND_HOST_PORT:-7860}:7860"]
     volumes:
       - hfcache:/data/hf         # Laya weights survive restarts
@@ -91,12 +98,11 @@ services:
     restart: unless-stopped
     environment:
       BACKEND_URL: http://backend:7860
-      # The BFF mints LiveKit tokens for the /call page (secret stays server-side).
       LIVEKIT_URL: ${LIVEKIT_URL:-}
-      LIVEKIT_API_KEY: ${LIVEKIT_API_KEY:-}
-      LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET:-}
       LIVEKIT_AGENT_NAME: ${LIVEKIT_AGENT_NAME:-bank-agent}
       # BACKEND_TOKEN is only needed for the private HF Space in production.
+    # The BFF mints LiveKit tokens for the /call page; the secret stays server-side.
+    secrets: [LIVEKIT_API_KEY, LIVEKIT_API_SECRET]
     ports: ["127.0.0.1:${WEB_HOST_PORT:-3000}:3000"]
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/api/healthz"]
@@ -105,6 +111,17 @@ services:
       retries: 5
     depends_on:
       backend: { condition: service_healthy }
+
+# Created by `make secrets` (scripts/make-secrets.sh). Never committed.
+secrets:
+  POSTGRES_PASSWORD: { file: ./secrets/POSTGRES_PASSWORD }
+  ADMIN_DATABASE_URL: { file: ./secrets/ADMIN_DATABASE_URL }
+  BANK_DATABASE_URL: { file: ./secrets/BANK_DATABASE_URL }
+  ORCHESTRATOR_DATABASE_URL: { file: ./secrets/ORCHESTRATOR_DATABASE_URL }
+  TOKEN_SIGNING_KEY: { file: ./secrets/TOKEN_SIGNING_KEY }
+  LLM_API_KEY: { file: ./secrets/LLM_API_KEY }
+  LIVEKIT_API_KEY: { file: ./secrets/LIVEKIT_API_KEY }
+  LIVEKIT_API_SECRET: { file: ./secrets/LIVEKIT_API_SECRET }
 
 volumes:
   pgdata:

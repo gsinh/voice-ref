@@ -12,8 +12,9 @@ One **Postgres**: a container locally, **Neon** (free tier) in production. Each 
 gets its **own schema and its own login role** (`bank`, `orchestrator`, …) and can only
 touch what it owns. Kestra gets its own database.
 
-- `infra/postgres/bootstrap.sql` is the only admin step: it creates the roles and
-  schemas, once per environment.
+- `python -m gateway bootstrap` is the only admin step: it creates (or rotates) each
+  module's login and schema, sending Postgres SCRAM verifiers, never passwords
+  (ADR-0019).
 - Each module ships its own forward-only SQL migrations and runs them **as its own
   role** (`python -m gateway migrate`), so it can never alter another module's schema.
 - Demo data is a separate, idempotent `seed` command that can be re-run at any time.

@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "MCP server: the only way the LLM reaches bank data (ADR-0006)."
 requires-python = ">=3.12,<3.13"
 dependencies = [
+    "config-kit",
     "fastapi>=0.116",
     "pydantic-settings>=2.10",
     "mcp>=1.24,<2",
@@ -12,6 +13,7 @@ dependencies = [
 ]
 
 [tool.uv.sources]
+config-kit = { workspace = true }
 signed-tokens = { workspace = true }
 
 [build-system]

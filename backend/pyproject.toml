@@ -31,7 +31,7 @@ select = ["E", "F", "W", "I", "B", "UP", "SIM", "ASYNC", "S", "N", "RUF"]
 ignore = ["S104"]  # binding to 0.0.0.0 is intended inside containers
 
 [tool.ruff.lint.isort]
-known-first-party = ["gateway", "voice_worker", "signed_tokens", "orchestrator", "banking_api", "mcp_server"]
+known-first-party = ["gateway", "voice_worker", "signed_tokens", "config_kit", "orchestrator", "banking_api", "mcp_server"]
 
 [tool.ruff.lint.per-file-ignores]
 "**/tests/**" = ["S101"]  # assert is how pytest works
@@ -45,6 +45,7 @@ mypy_path = [
     "apps/gateway/src",
     "apps/voice_worker/src",
     "libs/signed_tokens/src",
+    "libs/config_kit/src",
     "modules/orchestrator/src",
     "modules/banking_api/src",
     "modules/mcp_server/src",
@@ -57,7 +58,7 @@ addopts = "--import-mode=importlib"
 
 # Module boundaries, enforced in CI (ADR-0015). Run: uv run lint-imports
 [tool.importlinter]
-root_packages = ["gateway", "voice_worker", "signed_tokens", "orchestrator", "banking_api", "mcp_server"]
+root_packages = ["gateway", "voice_worker", "signed_tokens", "config_kit", "orchestrator", "banking_api", "mcp_server"]
 
 [[tool.importlinter.contracts]]
 name = "Modules are independent of each other"
@@ -73,8 +74,8 @@ forbidden_modules = ["gateway"]
 [[tool.importlinter.contracts]]
 name = "Shared libs depend on nothing of ours"
 type = "forbidden"
-source_modules = ["signed_tokens"]
-forbidden_modules = ["gateway", "orchestrator", "banking_api", "mcp_server"]
+source_modules = ["signed_tokens", "config_kit"]
+forbidden_modules = ["gateway", "voice_worker", "orchestrator", "banking_api", "mcp_server"]
 
 [[tool.importlinter.contracts]]
 name = "The voice worker is a client: it talks to the orchestrator over HTTP only"

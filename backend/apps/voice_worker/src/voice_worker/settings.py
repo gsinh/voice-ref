@@ -2,14 +2,16 @@ from functools import lru_cache
 from typing import Literal
 
 from pydantic import Field, SecretStr
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings
+
+from config_kit import settings_config
 
 
 class Settings(BaseSettings):
     """Voice worker settings. Shared names (LiveKit, LLM key) are read as-is; the rest use
     the `VOICE_` prefix."""
 
-    model_config = SettingsConfigDict(env_prefix="VOICE_", extra="ignore", frozen=True)
+    model_config = settings_config(env_prefix="VOICE_")
 
     # LiveKit (Cloud by default). The worker connects *out*, so no inbound port is needed.
     livekit_url: str = Field("", validation_alias="LIVEKIT_URL")

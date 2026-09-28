@@ -1,11 +1,13 @@
 from pydantic import Field, SecretStr
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings
+
+from config_kit import settings_config
 
 
 class Settings(BaseSettings):
     """MCP module settings, read from `MCP_`-prefixed env vars (plus shared ones)."""
 
-    model_config = SettingsConfigDict(env_prefix="MCP_", extra="ignore", frozen=True)
+    model_config = settings_config(env_prefix="MCP_")
 
     # Reached over loopback HTTP even inside the monolith, so the boundary stays real.
     banking_api_url: str = "http://127.0.0.1:7860/bank"

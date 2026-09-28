@@ -42,6 +42,7 @@ its own migrations.
 uv sync --all-packages                 # install
 uv run python -m gateway serve         # HTTP server alone on :7860
 uv run python -m gateway start         # launcher: server + SIDECARS (container default)
+uv run python -m gateway bootstrap     # module logins + schemas (needs ADMIN_DATABASE_URL)
 uv run python -m gateway migrate seed  # apply migrations, reset demo data
 uv run ruff check . && uv run mypy apps libs modules && uv run lint-imports
 ```
@@ -49,7 +50,7 @@ uv run ruff check . && uv run mypy apps libs modules && uv run lint-imports
 ## Tests
 
 Unit tests run anywhere. Integration and end-to-end tests need a bootstrapped and
-migrated Postgres, and are skipped otherwise:
+migrated Postgres (`bootstrap migrate` with the URLs below), and are skipped otherwise:
 
 ```bash
 export TEST_DATABASE_URL=postgresql://postgres:<pw>@localhost:5432/voiceref

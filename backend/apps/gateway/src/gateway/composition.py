@@ -7,6 +7,7 @@ from fastapi import FastAPI
 import banking_api
 import mcp_server
 import orchestrator
+from gateway.bootstrap import Login
 from gateway.health import ReadinessCheck, postgres_check
 from gateway.migrate import MigrationSet
 
@@ -61,4 +62,12 @@ def migration_sets(ms: ModuleSettings) -> list[MigrationSet]:
             schema=banking_api.SCHEMA,
             directory=banking_api.MIGRATIONS,
         ),
+    ]
+
+
+def logins(ms: ModuleSettings) -> list[Login]:
+    """Each data-owning module's login, read from the URL it connects with."""
+    return [
+        Login.from_url(ms.bank.database_url, banking_api.SCHEMA),
+        Login.from_url(ms.orchestrator.database_url, "orchestrator"),
     ]

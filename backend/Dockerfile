@@ -21,6 +21,7 @@ WORKDIR /app
 COPY pyproject.toml uv.lock ./
 COPY apps/gateway/pyproject.toml apps/gateway/pyproject.toml
 COPY apps/voice_worker/pyproject.toml apps/voice_worker/pyproject.toml
+COPY libs/config_kit/pyproject.toml libs/config_kit/pyproject.toml
 COPY libs/signed_tokens/pyproject.toml libs/signed_tokens/pyproject.toml
 COPY modules/banking_api/pyproject.toml modules/banking_api/pyproject.toml
 COPY modules/mcp_server/pyproject.toml modules/mcp_server/pyproject.toml

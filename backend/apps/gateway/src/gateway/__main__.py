@@ -2,9 +2,10 @@
 
 python -m gateway start     # default: gateway + sidecars under the launcher
 python -m gateway serve     # the HTTP server alone
+python -m gateway bootstrap # create/rotate module logins + schemas (needs ADMIN_DATABASE_URL)
 python -m gateway migrate   # apply each module's pending migrations
 python -m gateway seed      # reset the synthetic demo data
-python -m gateway migrate seed   # several commands, in order
+python -m gateway bootstrap migrate seed   # several commands, in order
 """
 
 import argparse
@@ -16,14 +17,15 @@ import uvicorn
 import banking_api
 import orchestrator
 from gateway import launcher
-from gateway.composition import ModuleSettings, migration_sets
+from gateway.bootstrap import bootstrap
+from gateway.composition import ModuleSettings, logins, migration_sets
 from gateway.logging import configure_logging
 from gateway.migrate import apply, run_script
 from gateway.settings import Settings
 
 log = logging.getLogger("gateway")
 
-COMMANDS = ["start", "serve", "migrate", "seed"]
+COMMANDS = ["start", "serve", "bootstrap", "migrate", "seed"]
 
 
 def main() -> None:
@@ -54,6 +56,10 @@ def run_command(command: str, settings: Settings, modules: ModuleSettings) -> No
             log_config=None,
             timeout_graceful_shutdown=10,
         )
+    elif command == "bootstrap":
+        if settings.admin_database_url is None:
+            raise SystemExit("bootstrap needs ADMIN_DATABASE_URL (the database admin login)")
+        bootstrap(settings.admin_database_url.get_secret_value(), logins(modules))
     elif command == "migrate":
         for ms in migration_sets(modules):
             applied = apply(ms)

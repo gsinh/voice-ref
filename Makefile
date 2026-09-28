@@ -1,17 +1,22 @@
 # The commands a contributor runs. CI runs the same targets.
-.PHONY: help setup up down logs ps db-reset seed lint fmt typecheck test check web-check
+.PHONY: help setup secrets rotate-db-passwords up down logs ps db-reset seed lint fmt typecheck test check web-check
 
 UV := uv --directory backend
 
 help:            ## Show targets
 	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-12s %s\n", $$1, $$2}'
 
-setup:           ## Install backend + web dependencies, create .env if missing
+setup:           ## Install dependencies, create .env and the secrets directory
 	$(UV) sync --all-packages
 	cd web && npm ci
 	@test -f .env || (cp .env.example .env && echo "Created .env from .env.example")
+	@./scripts/make-secrets.sh
+
+secrets:         ## Create missing secrets in ./secrets (keeps existing ones)
+	@./scripts/make-secrets.sh
 
 up:              ## Build and start the local stack, wait until healthy
+	@./scripts/make-secrets.sh >/dev/null
 	docker compose up -d --build --wait
 
 down:            ## Stop the stack (keeps data)
@@ -25,6 +30,12 @@ ps:              ## Show service status
 
 seed:            ## Reset the demo data
 	docker compose run --rm migrate seed
+
+rotate-db-passwords: ## New module DB passwords: regenerate the URLs, re-run bootstrap
+	rm -f secrets/BANK_DATABASE_URL secrets/ORCHESTRATOR_DATABASE_URL
+	@./scripts/make-secrets.sh
+	docker compose run --rm migrate bootstrap
+	docker compose up -d --force-recreate backend
 
 db-reset:        ## Delete the database volume; next `make up` re-creates everything
 	docker compose down -v

@@ -23,5 +23,6 @@ ADR that supersedes the old one rather than editing history.
 | [0015](0015-modular-monolith.md) | Modular monolith: independent modules, one process | Accepted |
 | [0016](0016-free-tier-deployment.md) | Free-tier deployment: HF Spaces, Neon, Cloudflare Workers | Accepted |
 | [0017](0017-agentgateway.md) | agentgateway for LLM and MCP traffic, as a sidecar | Accepted (Phase 3) |
+| [0019](0019-secrets-handling.md) | Secrets: never in SQL, environment dumps or the repo | Accepted |
 
 Template: [`template.md`](template.md).
