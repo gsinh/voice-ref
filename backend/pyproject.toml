@@ -34,7 +34,7 @@ ignore = ["S104"]  # binding to 0.0.0.0 is intended inside containers
 known-first-party = ["gateway", "voice_worker", "signed_tokens", "config_kit", "orchestrator", "banking_api", "mcp_server"]
 
 [tool.ruff.lint.per-file-ignores]
-"**/tests/**" = ["S101"]  # assert is how pytest works
+"**/tests/**" = ["S101", "S603"]  # pytest asserts; tests run fixed subprocess commands
 
 [tool.mypy]
 python_version = "3.12"

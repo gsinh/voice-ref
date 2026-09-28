@@ -7,6 +7,7 @@ Synthesis runs in a worker thread so the audio loop never blocks.
 
 import asyncio
 import logging
+import re
 import uuid
 from pathlib import Path
 from typing import Any
@@ -46,6 +47,28 @@ def ensure_model_files(directory: str, model_file: str) -> tuple[Path, Path]:
 def load_kokoro(directory: str, model_file: str) -> Kokoro:
     model, voices = ensure_model_files(directory, model_file)
     return Kokoro(str(model), str(voices))
+
+
+MAX_PIECE_CHARS = 120
+_CLAUSE_END = re.compile(r"(?<=[,;:—])\s+")
+
+
+def speakable_pieces(text: str, max_chars: int = MAX_PIECE_CHARS) -> list[str]:
+    """Split text into pieces short enough to start playing quickly.
+
+    LiveKit already splits sentences; this splits *long* sentences at clause breaks, then
+    at spaces, so no single piece holds up the first audio.
+    """
+    pieces: list[str] = []
+    for clause in _CLAUSE_END.split(text.strip()):
+        while len(clause) > max_chars:
+            cut = clause.rfind(" ", 0, max_chars)
+            cut = cut if cut > 0 else max_chars
+            pieces.append(clause[:cut].strip())
+            clause = clause[cut:]
+        if clause.strip():
+            pieces.append(clause.strip())
+    return pieces
 
 
 def to_pcm16(samples: np.ndarray) -> bytes:
@@ -97,8 +120,9 @@ class _KokoroStream(tts.ChunkedStream):
             num_channels=1,
             mime_type="audio/pcm",
         )
-        text = self._input_text.strip()
-        if text:
-            samples = await asyncio.to_thread(engine.render, text)
+        # Push audio piece by piece: time to first audio is the first *clause*, not the
+        # whole sentence (measured: a long run-on reply took 8 s to start speaking).
+        for piece in speakable_pieces(self._input_text):
+            samples = await asyncio.to_thread(engine.render, piece)
             output_emitter.push(to_pcm16(samples))
         output_emitter.flush()

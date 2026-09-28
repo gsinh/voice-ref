@@ -60,7 +60,7 @@ A large Indian retail bank handles millions of calls a month through a menu-driv
 │    /bank    banking_api   mock system of record                                 │
 │  process 2: laya-serve    127.0.0.1:8100 — System 1 decisions (or hosted Jev)   │
 │  process 2b: agentgateway 127.0.0.1:15000 — LLM + MCP policy, failover (Ph. 3)  │
-│  process 3: voice worker  Silero VAD · Groq Whisper · Kokoro TTS  (Phase 2)     │
+│  process 3: voice worker  Silero VAD · Groq Whisper · Kokoro TTS → /api/chat   │
 └──────────────────────────────────────────────────────────────────────────────────┘
         │                          │                          │
         ▼                          ▼                          ▼
@@ -185,7 +185,7 @@ voice-ref/
 |---|---|---|
 | **0. Skeleton** ✓ | Modular-monolith backend (gateway + 4 module stubs), health checks, per-module roles/schemas, migration runner, seed data, Next.js SSR status page, compose, CI (lint, boundaries, typecheck, tests, image builds), ADRs | `make up` starts everything healthy; CI green |
 | **1. Core (text)** ✓ | Banking API, MCP tools, signed tokens, Laya sidecar + decision cascade, LangGraph graph (OTP auth, routing, account agent, card flow with interrupt-based confirmation), launcher, `/chat` with per-turn trace | All three use cases work in text; verified end to end with a scripted OpenAI-compatible model (Groq and Laya to be confirmed on a machine that can reach them) |
-| **2. Voice** | Voice worker (LiveKit Cloud, Silero, Groq Whisper, Kokoro), `/call`, `latency-probe` | All three use cases work by voice; per-stage latency captured |
+| **2. Voice** ✓ | Voice worker (LiveKit Agents, Silero VAD, Groq Whisper, Kokoro), orchestrator as the LLM plugin, spoken one-time codes, `/call` with live transcript and per-stage latency, `latency-probe` | All three use cases work by voice; verified end to end with self-hosted LiveKit, real VAD and TTS, scripted STT/LLM |
 | **3. Production traits** | OTel + LangSmith, `/observability`, fault toggles, fallback controller, human handoff, audit log, Kestra (`workflows` profile locally, own HF Space in production), memory (Synap + Postgres adapter), agentgateway sidecar with failover and tool policies (ADR-0017) | Every fault degrades gracefully; latency visible per turn |
 | **4. Evaluation** | ~80-case dataset incl. Hindi/Hinglish; intent, tool-choice, task completion, groundedness, sensitive-action compliance; Laya vs Llama; Groq vs Ollama; `/evals` | `make eval` produces a report; nightly Kestra run |
 | **5. Ship** | Neon project + bootstrap, backend and Kestra Spaces, web on Cloudflare Workers (OpenNext), keep-alive cron, deploy workflows, `/cost`, `/architecture`, demo script, recording | Public URL up without a laptop; 5-minute demo rehearsed |

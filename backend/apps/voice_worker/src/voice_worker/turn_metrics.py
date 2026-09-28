@@ -31,15 +31,19 @@ class TurnMetrics:
         elif isinstance(m, metrics.TTSMetrics) and sid in self.llm_ttft:
             eou = self.eou.pop(sid, 0.0)
             orch = self.llm_ttft.pop(sid)
+            # LiveKit reports ttfb = -1 when no audio was produced: the caller spoke over
+            # the agent (barge-in) before the first audio. Say so; don't report -1000 ms.
+            interrupted = m.cancelled or m.ttfb < 0
             stages = {
                 "end_of_utterance_ms": round(eou * 1000),
                 "orchestrator_ms": round(orch * 1000),
-                "tts_first_audio_ms": round(m.ttfb * 1000),
+                "tts_first_audio_ms": None if interrupted else round(m.ttfb * 1000),
             }
             turn = orchestrator_turn or {}
             return {
                 "stages": stages,
-                "total_ms": sum(stages.values()),
+                "interrupted": interrupted,
+                "total_ms": sum(v for v in stages.values() if v is not None),
                 "intent": turn.get("intent"),
                 "awaiting": turn.get("awaiting"),
                 "outcome": turn.get("outcome"),

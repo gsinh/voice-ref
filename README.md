@@ -49,6 +49,16 @@ Ollama.
 | http://localhost:3000 | Overview and system status |
 | http://localhost:7860/docs | Backend API docs |
 
+### Voice
+
+1. Create a free LiveKit Cloud project; put its key and secret in
+   `secrets/LIVEKIT_API_KEY` and `secrets/LIVEKIT_API_SECRET`.
+2. In `.env`: `LIVEKIT_URL=wss://<project>.livekit.cloud` and `SIDECARS=laya,voice`.
+3. `make up`, open http://localhost:3000/call, press **Start call** and talk. The first
+   call downloads Kokoro's voice (~420 MB).
+
+Measure your network costs with `docker compose exec backend python -m voice_worker.probe`.
+
 Try, as Aarav Sharma (one-time code `123456`):
 - "What's my balance?"
 - "What is this ₹1,999 charge from yesterday?"
@@ -63,7 +73,8 @@ runs.
 
 ## Status
 
-Phases 0–1 are done: the text path works end to end, with guardrails enforced in code
-(OTP, token-derived identity, confirmation tokens, idempotent blocking). Next is Phase 2:
-voice (LiveKit Cloud, Silero VAD, Whisper, Kokoro). See the
+Phases 0–2 are done: text and voice run the same conversation graph end to end, with
+guardrails enforced in code (OTP, token-derived identity, confirmation tokens, idempotent
+blocking) and per-stage latency on every voice turn. Next is Phase 3: production traits
+(tracing, fault injection and fallback, Kestra workflows, memory, agentgateway). See the
 [plan](docs/PLAN.md#8-phases).

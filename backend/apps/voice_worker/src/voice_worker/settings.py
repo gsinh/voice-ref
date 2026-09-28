@@ -43,6 +43,12 @@ class Settings(BaseSettings):
 
     greeting: str = "Welcome to Demo Bank. How can I help you today?"
 
+    # Capacity. LiveKit's production default pre-starts one process per CPU core, each
+    # loading its own VAD and Kokoro: too heavy for a 2-vCPU Space. One warm process
+    # serves several calls; the worker reports "full" above this CPU load.
+    idle_processes: int = 1
+    load_threshold: float = 0.9
+
     def stt_key(self) -> str:
         return (self.stt_api_key.get_secret_value() or self.llm_api_key.get_secret_value()) or ""
 

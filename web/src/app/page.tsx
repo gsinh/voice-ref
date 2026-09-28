@@ -6,7 +6,7 @@ import { backendStatus } from "@/lib/backend";
 const phases = [
   { n: 0, name: "Skeleton", detail: "Modular monolith, Postgres, CI, ADRs", done: true },
   { n: 1, name: "Core (text)", detail: "LangGraph, Laya, MCP, three use cases", done: true },
-  { n: 2, name: "Voice", detail: "LiveKit Cloud, Silero VAD, Whisper, Kokoro", done: false },
+  { n: 2, name: "Voice", detail: "LiveKit Cloud, Silero VAD, Whisper, Kokoro", done: true },
   { n: 3, name: "Production traits", detail: "Tracing, faults, fallback, Kestra, memory", done: false },
   { n: 4, name: "Evaluation", detail: "Intent, tools, groundedness, compliance", done: false },
   { n: 5, name: "Ship", detail: "HF Spaces, Neon, Cloudflare Workers, demo", done: false },
@@ -30,12 +30,20 @@ export default async function Home() {
         outcomes, guardrails, latency, observability and cost.
       </p>
 
-      <Link
-        href="/chat"
-        className="mt-6 inline-block rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white"
-      >
-        Try the text chat →
-      </Link>
+      <div className="mt-6 flex flex-wrap gap-3">
+        <Link
+          href="/call"
+          className="inline-block rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white"
+        >
+          Start a voice call →
+        </Link>
+        <Link
+          href="/chat"
+          className="inline-block rounded-md border border-zinc-300 px-4 py-2 text-sm font-medium dark:border-zinc-700"
+        >
+          Text chat
+        </Link>
+      </div>
 
       <section className="mt-10">
         <div className="flex items-baseline justify-between gap-4">

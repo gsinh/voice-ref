@@ -8,7 +8,13 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from voice_worker.kokoro_tts import VOICES_FILE, KokoroTTS, ensure_model_files, to_pcm16
+from voice_worker.kokoro_tts import (
+    VOICES_FILE,
+    KokoroTTS,
+    ensure_model_files,
+    speakable_pieces,
+    to_pcm16,
+)
 
 MODEL_DIR = os.environ.get("KOKORO_TEST_DIR")
 
@@ -40,3 +46,15 @@ async def test_synthesises_speech_frames() -> None:
     seconds = sum(f.samples_per_channel for f in frames) / 24000
     assert frames and frames[0].sample_rate == 24000
     assert 0.8 < seconds < 5
+
+
+def test_short_sentences_stay_whole() -> None:
+    assert speakable_pieces("Your card is now blocked.") == ["Your card is now blocked."]
+
+
+def test_long_sentences_split_at_clauses_then_spaces() -> None:
+    text = "Sure, I found it: the charge of ₹1,999 on 25 September was StreamPlus, " + "a " * 80
+    pieces = speakable_pieces(text, max_chars=60)
+    assert pieces[0] == "Sure,"
+    assert all(len(p) <= 60 for p in pieces)
+    assert " ".join(pieces).split() == text.split()

@@ -12,6 +12,7 @@ Needs TEST_BANK_DATABASE_URL and TEST_ORCHESTRATOR_DATABASE_URL (migrated databa
 
 import json
 import os
+import re
 import socket
 import threading
 import time
@@ -91,8 +92,10 @@ def fake_llm_router() -> APIRouter:
             said = messages[-1]["content"]
             return _completion(_call("choose_option", {"label": _choose(system, said)}))
         last = messages[-1]
-        if last["role"] == "tool":  # answer from what the tool returned
-            return _completion({"role": "assistant", "content": f"Here you go: {last['content']}"})
+        if last["role"] == "tool":  # answer in one sentence from what the tool returned
+            amounts = re.findall(r"₹[\d,]+\.\d\d", str(last["content"]))
+            answer = f"Your balance is {amounts[0]}." if amounts else "I couldn't find that."
+            return _completion({"role": "assistant", "content": answer})
         if "get_account_balance" in tool_names:
             return _completion(_call("get_account_balance", {}))
         return _completion({"role": "assistant", "content": "Hello! How can I help?"})

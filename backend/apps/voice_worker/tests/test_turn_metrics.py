@@ -21,10 +21,10 @@ def _llm(sid: str, ttft: float) -> metrics.LLMMetrics:
     )  # fmt: skip
 
 
-def _tts(sid: str, ttfb: float) -> metrics.TTSMetrics:
+def _tts(sid: str, ttfb: float, cancelled: bool = False) -> metrics.TTSMetrics:
     return metrics.TTSMetrics(
         label="x", request_id="r", timestamp=0, ttfb=ttfb, duration=1, audio_duration=1,
-        cancelled=False, characters_count=10, streamed=False, speech_id=sid,
+        cancelled=cancelled, characters_count=10, streamed=False, speech_id=sid,
     )  # fmt: skip
 
 
@@ -47,3 +47,14 @@ def test_a_turn_is_summarised_when_its_first_audio_is_ready() -> None:
 def test_the_greeting_is_not_reported_as_a_turn() -> None:
     # session.say() speaks without the orchestrator: TTS metrics with no LLM stage.
     assert TurnMetrics().add(_tts("greeting", 0.3), None) is None
+
+
+def test_a_reply_interrupted_before_any_audio_is_reported_as_such() -> None:
+    turns = TurnMetrics()
+    turns.add(_eou("s2", 0.5), None)
+    turns.add(_llm("s2", 0.4), None)
+    summary = turns.add(_tts("s2", -1.0, cancelled=True), None)
+    assert summary is not None
+    assert summary["interrupted"] is True
+    assert summary["stages"]["tts_first_audio_ms"] is None
+    assert summary["total_ms"] == 900

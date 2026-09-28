@@ -52,7 +52,13 @@ def build_tts(settings: Settings, proc: JobProcess) -> tts.TTS[Any]:
     )
 
 
-server = AgentServer(setup_fnc=prewarm)
+_settings = get_settings()
+server = AgentServer(
+    setup_fnc=prewarm,
+    num_idle_processes=_settings.idle_processes,
+    load_threshold=_settings.load_threshold,
+    initialize_process_timeout=30.0,  # loading models; the download happens at startup
+)
 
 
 @server.rtc_session()
